@@ -1,16 +1,13 @@
-// Pulse CI/CD pipeline.
-// Builds the container images, runs the 66 backend tests, and (optionally)
-// pushes images to ECR. ECR account ID is parameterised — set ECR_REGISTRY
-// and AWS_REGION below or as Jenkins environment variables.
+// Pulse CI/CD pipeline (Option 1: artifact-based delivery, no registry).
+// Builds the images, runs the 66 backend tests, and — on success — saves the
+// backend image as a tarball and archives it. The local deploy-local.sh script
+// downloads that artifact and deploys it to local k3s, so k3s runs the exact
+// image this pipeline built and tested.
 pipeline {
     agent any
 
     environment {
-        // Override these for your own AWS account, e.g.
-        //   123456789012.dkr.ecr.eu-central-1.amazonaws.com
-        ECR_REGISTRY = "${env.ECR_REGISTRY ?: 'CHANGE_ME.dkr.ecr.eu-central-1.amazonaws.com'}"
-        AWS_REGION   = "${env.AWS_REGION ?: 'eu-central-1'}"
-        IMAGE_TAG    = "${env.BUILD_NUMBER}"
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
 
     options {
@@ -40,42 +37,41 @@ pipeline {
         stage('Build images') {
             steps {
                 sh '''
-                    docker build -t pulse-backend:${IMAGE_TAG}      portal/backend
-                    docker build -t pulse-frontend:${IMAGE_TAG}     portal/frontend
+                    docker build -t pulse-backend:${IMAGE_TAG}       portal/backend
+                    docker build -t pulse-frontend:${IMAGE_TAG}      portal/frontend
                     docker build -t pulse-url-shortener:${IMAGE_TAG} services/url-shortener
+
+                    # Also tag :latest so the deploy script can fetch a stable name
+                    docker tag pulse-backend:${IMAGE_TAG}       pulse-backend:latest
+                    docker tag pulse-frontend:${IMAGE_TAG}      pulse-frontend:latest
+                    docker tag pulse-url-shortener:${IMAGE_TAG} pulse-url-shortener:latest
                 '''
             }
         }
 
-        stage('Push to ECR') {
-            when {
-                // Only push when a real registry has been configured.
-                expression { return env.ECR_REGISTRY && !env.ECR_REGISTRY.startsWith('CHANGE_ME') }
-            }
+        stage('Save image artifacts') {
             steps {
                 sh '''
-                    aws ecr get-login-password --region ${AWS_REGION} \
-                      | docker login --username AWS --password-stdin ${ECR_REGISTRY}
-
-                    for svc in backend frontend url-shortener; do
-                      docker tag  pulse-$svc:${IMAGE_TAG} ${ECR_REGISTRY}/pulse-$svc:${IMAGE_TAG}
-                      docker tag  pulse-$svc:${IMAGE_TAG} ${ECR_REGISTRY}/pulse-$svc:latest
-                      docker push ${ECR_REGISTRY}/pulse-$svc:${IMAGE_TAG}
-                      docker push ${ECR_REGISTRY}/pulse-$svc:latest
-                    done
+                    # Save the built images as tarballs for the local deploy step.
+                    docker save pulse-backend:latest       -o pulse-backend.tar
+                    docker save pulse-frontend:latest      -o pulse-frontend.tar
+                    docker save pulse-url-shortener:latest -o pulse-url-shortener.tar
                 '''
+                // Archive so they are downloadable via the Jenkins artifact API.
+                archiveArtifacts artifacts: '*.tar', fingerprint: true
             }
         }
     }
 
     post {
         success {
-            echo "Pipeline succeeded — images built and tests passed (build ${IMAGE_TAG})."
+            echo "Build ${IMAGE_TAG} passed — image artifacts archived and ready for deploy-local.sh."
         }
         failure {
-            echo "Pipeline failed — check the stage logs above."
+            echo "Pipeline failed — nothing archived; deploy-local.sh will refuse to deploy."
         }
         always {
+            sh 'rm -f *.tar || true'
             sh 'docker image prune -f || true'
         }
     }

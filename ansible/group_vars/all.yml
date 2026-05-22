@@ -1,0 +1,4 @@
+---
+# Jenkins admin credentials (plain — this is a demo project, not production).
+jenkins_admin_user: "admin"
+jenkins_admin_password: "admin"

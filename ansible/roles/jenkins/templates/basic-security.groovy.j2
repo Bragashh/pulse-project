@@ -1,5 +1,5 @@
 #!groovy
-// Runs once on Jenkins startup. Creates the admin user from vaulted credentials
+// Runs once on Jenkins startup. Creates the admin user from group_vars
 // and enforces login. Idempotent: re-running just re-asserts the same state.
 import jenkins.model.*
 import hudson.security.*
@@ -7,7 +7,7 @@ import hudson.security.*
 def instance = Jenkins.getInstance()
 
 def hudsonRealm = new HudsonPrivateSecurityRealm(false)
-hudsonRealm.createAccount("{{ jenkins_admin_user }}", "{{ vault_jenkins_admin_password }}")
+hudsonRealm.createAccount("{{ jenkins_admin_user }}", "{{ jenkins_admin_password }}")
 instance.setSecurityRealm(hudsonRealm)
 
 def strategy = new FullControlOnceLoggedInAuthorizationStrategy()

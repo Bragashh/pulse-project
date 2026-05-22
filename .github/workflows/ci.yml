@@ -6,9 +6,6 @@ on:
   pull_request:
     branches: [ main ]
 
-env:
-  AWS_REGION: eu-central-1
-
 jobs:
   test:
     name: Backend tests (66)
@@ -30,44 +27,3 @@ jobs:
         run: |
           cd portal/backend
           python -m pytest -v
-
-  build-and-push:
-    name: Build & push images to ECR
-    runs-on: ubuntu-latest
-    needs: test
-    # Only runs if AWS secrets are configured (skips cleanly on forks without them).
-    if: ${{ github.event_name == 'push' }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check for AWS credentials
-        id: creds
-        run: |
-          if [ -n "${{ secrets.AWS_ACCOUNT_ID }}" ]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "AWS secrets not set — skipping image push (this is expected on forks)."
-          fi
-
-      - name: Configure AWS credentials
-        if: steps.creds.outputs.configured == 'true'
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        if: steps.creds.outputs.configured == 'true'
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and push images
-        if: steps.creds.outputs.configured == 'true'
-        env:
-          ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.eu-central-1.amazonaws.com
-        run: |
-          for svc in backend frontend; do
-            docker build -t $ECR_REGISTRY/pulse-$svc:latest portal/$svc/
-            docker push $ECR_REGISTRY/pulse-$svc:latest
-          done

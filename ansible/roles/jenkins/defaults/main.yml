@@ -1,5 +1,4 @@
 ---
-# Jenkins admin user. The PASSWORD comes from the vault (see group_vars/all/vault.yml).
 jenkins_admin_user: "admin"
 
 # Jenkins version channel — "stable" pulls the LTS line.

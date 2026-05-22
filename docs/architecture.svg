@@ -1,111 +1,86 @@
-<svg viewBox="0 0 1040 760" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', system-ui, sans-serif">
+<svg viewBox="0 0 1060 720" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', system-ui, sans-serif">
   <defs>
     <style>
-      .bg      { fill: #0d1117; }
-      .lane    { fill: #11161d; stroke: #30363d; stroke-width: 1; }
-      .laneaws { fill: #15130c; stroke: #9e6a03; stroke-width: 1.5; }
-      .box     { fill: #161b22; stroke: #30363d; stroke-width: 1.5; }
-      .boxk    { fill: #0f1a14; stroke: #2ea043; stroke-width: 1.5; }
-      .boxobs  { fill: #1a1410; stroke: #d29922; stroke-width: 1.5; }
-      .boxaws  { fill: #1c1407; stroke: #d29922; stroke-width: 1.5; }
-      .title   { fill: #e6edf3; font-weight: 700; }
-      .label   { fill: #e6edf3; font-size: 13px; font-weight: 600; }
-      .sub     { fill: #8b949e; font-size: 11px; }
-      .lane-l  { fill: #6e7681; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; }
-      .flow    { stroke: #58a6ff; stroke-width: 2; fill: none; }
-      .flowg   { stroke: #3fb950; stroke-width: 2; fill: none; }
-      .flowo   { stroke: #d29922; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
-      .arrowb  { fill: #58a6ff; }
-      .arrowo  { fill: #d29922; }
+      .bg     { fill: #0d1117; }
+      .lane   { fill: #11161d; stroke: #30363d; stroke-width: 1; }
+      .laneaws{ fill: #15130c; stroke: #9e6a03; stroke-width: 1.5; }
+      .box    { fill: #161b22; stroke: #30363d; stroke-width: 1.5; }
+      .boxk   { fill: #0f1a14; stroke: #2ea043; stroke-width: 1.5; }
+      .boxobs { fill: #1a1410; stroke: #d29922; stroke-width: 1.5; }
+      .boxaws { fill: #1c1407; stroke: #d29922; stroke-width: 1.5; }
+      .title  { fill: #e6edf3; font-weight: 700; }
+      .label  { fill: #e6edf3; font-size: 13px; font-weight: 600; }
+      .sub    { fill: #8b949e; font-size: 11px; }
+      .lane-l { fill: #6e7681; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; }
+      .flowb  { stroke: #58a6ff; stroke-width: 2.5; fill: none; }
+      .flowg  { stroke: #3fb950; stroke-width: 2; fill: none; }
+      .flowo  { stroke: #d29922; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+      .arrowb { fill: #58a6ff; } .arrowg { fill: #3fb950; } .arrowo { fill: #d29922; }
+      .bridge { fill: #1f6feb; font-size: 11px; font-weight: 700; }
     </style>
     <marker id="ab" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" class="arrowb"/></marker>
+    <marker id="ag" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" class="arrowg"/></marker>
     <marker id="ao" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" class="arrowo"/></marker>
   </defs>
 
-  <rect class="bg" x="0" y="0" width="1040" height="760"/>
-  <text x="40" y="44" class="title" font-size="22">Pulse — Self-Service DevOps Platform</text>
-  <text x="40" y="66" class="sub" font-size="12">Two independent worlds: the application runs locally on k3s · an AWS toolchain demonstrates Terraform → Ansible → Jenkins</text>
+  <rect class="bg" x="0" y="0" width="1060" height="720"/>
+  <text x="40" y="42" class="title" font-size="22">Pulse — Connected CI/CD Flow</text>
+  <text x="40" y="64" class="sub" font-size="12">Jenkins builds + tests on AWS → archives the image → the local deploy script pulls that exact image and runs it on k3s</text>
 
-  <!-- ===================== LOCAL WORLD ===================== -->
-  <text x="40" y="104" class="lane-l">LOCAL — developer machine / VM</text>
-  <rect class="lane" x="40" y="116" width="600" height="470" rx="10"/>
+  <!-- ===== AWS side ===== -->
+  <text x="40" y="104" class="lane-l">AWS — provisioned by Terraform, configured by Ansible</text>
+  <rect class="laneaws" x="40" y="116" width="470" height="300" rx="10"/>
 
-  <!-- user + dashboard -->
-  <rect class="box" x="64" y="140" width="250" height="58" rx="8"/>
-  <text x="84" y="166" class="label">Developer → Dashboard</text>
-  <text x="84" y="184" class="sub">HTML / JS · localhost:5000</text>
+  <rect class="box" x="64" y="140" width="200" height="60" rx="8"/>
+  <text x="84" y="165" class="label">Terraform</text>
+  <text x="84" y="183" class="sub">creates the EC2 (no EIP)</text>
 
-  <!-- backend -->
-  <rect class="box" x="64" y="226" width="250" height="72" rx="8"/>
-  <text x="84" y="252" class="label">Pulse Backend</text>
-  <text x="84" y="270" class="sub">Flask · REST API · metrics</text>
-  <text x="84" y="285" class="sub">deploy / promote / rollback</text>
+  <rect class="box" x="288" y="140" width="200" height="60" rx="8"/>
+  <text x="308" y="165" class="label">Ansible</text>
+  <text x="308" y="183" class="sub">installs + configures Jenkins</text>
 
-  <!-- sqlite -->
-  <rect class="box" x="64" y="326" width="250" height="56" rx="8"/>
-  <text x="84" y="350" class="label">SQLite</text>
-  <text x="84" y="366" class="sub">services + deployment audit log</text>
+  <rect class="boxaws" x="64" y="230" width="424" height="160" rx="8"/>
+  <text x="84" y="255" class="label">Jenkins pipeline (port 8080)</text>
+  <text x="84" y="284" class="sub">1 · checkout the repo</text>
+  <text x="84" y="306" class="sub">2 · build the Docker images</text>
+  <text x="84" y="328" class="sub">3 · run the 66 backend tests</text>
+  <text x="84" y="350" class="sub">4 · on success: docker save → archive image.tar</text>
+  <text x="84" y="372" class="sub">    (red build = nothing archived)</text>
 
-  <!-- observability -->
-  <rect class="boxobs" x="338" y="226" width="278" height="156" rx="8"/>
-  <text x="358" y="250" class="label">Observability (docker-compose)</text>
-  <text x="358" y="284" class="sub">Prometheus — scrapes /prometheus-metrics</text>
-  <text x="358" y="306" class="sub">Grafana — dashboards (admin/admin)</text>
-  <text x="358" y="328" class="sub">Loki — log storage</text>
-  <text x="358" y="350" class="sub">Promtail — ships container logs</text>
+  <path class="flowo" d="M264,170 L286,170" marker-end="url(#ao)"/>
+  <path class="flowo" d="M276,200 C276,214 200,218 180,228" marker-end="url(#ao)"/>
 
-  <!-- k3s -->
-  <rect class="boxk" x="64" y="410" width="552" height="152" rx="8"/>
-  <text x="84" y="434" class="label">k3s (local Kubernetes cluster)</text>
-  <rect class="box" x="84" y="450" width="244" height="96" rx="6"/>
-  <text x="100" y="472" class="label" font-size="12">namespace: pulse-deployed</text>
-  <text x="100" y="492" class="sub">services created via the dashboard</text>
-  <text x="100" y="508" class="sub">(backend calls the Kubernetes API)</text>
-  <text x="100" y="528" class="sub">staging + production deployments</text>
-  <rect class="box" x="344" y="450" width="252" height="96" rx="6"/>
-  <text x="360" y="472" class="label" font-size="12">namespace: url-shortener</text>
-  <text x="360" y="492" class="sub">example service: Redis + shortener</text>
-  <text x="360" y="508" class="sub">applied with kubectl</text>
+  <!-- ===== Bridge ===== -->
+  <text x="540" y="270" class="bridge">deploy-local.sh</text>
+  <text x="540" y="286" class="sub">checks build = SUCCESS</text>
+  <text x="540" y="300" class="sub">downloads image.tar</text>
+  <text x="540" y="314" class="sub">over the Jenkins API</text>
+  <path class="flowb" d="M490,300 L700,300" marker-end="url(#ab)"/>
+  <text x="556" y="338" class="sub">no green build → refuses to deploy</text>
 
-  <!-- local flows -->
-  <path class="flow" d="M189,198 L189,224" marker-end="url(#ab)"/>
-  <path class="flow" d="M189,298 L189,324" marker-end="url(#ab)"/>
-  <path class="flowo" d="M314,258 L336,272" marker-end="url(#ao)"/>
-  <path class="flowg" d="M150,382 L150,408" marker-end="url(#ab)"/>
+  <!-- ===== Local side ===== -->
+  <text x="710" y="104" class="lane-l">LOCAL — your machine / VM</text>
+  <rect class="lane" x="710" y="116" width="310" height="470" rx="10"/>
 
-  <!-- ===================== AWS WORLD ===================== -->
-  <text x="680" y="104" class="lane-l">AWS — CI/CD toolchain</text>
-  <rect class="laneaws" x="680" y="116" width="320" height="470" rx="10"/>
+  <rect class="box" x="734" y="230" width="262" height="70" rx="8"/>
+  <text x="754" y="256" class="label">docker load + k3s import</text>
+  <text x="754" y="276" class="sub">image goes into k3s containerd</text>
+  <text x="754" y="290" class="sub">(imagePullPolicy: Never)</text>
 
-  <rect class="box" x="704" y="146" width="272" height="74" rx="8"/>
-  <text x="724" y="172" class="label">Terraform</text>
-  <text x="724" y="190" class="sub">provisions one EC2 (no Elastic IP)</text>
-  <text x="724" y="206" class="sub">security group: SSH + 8080</text>
+  <rect class="boxk" x="734" y="320" width="262" height="90" rx="8"/>
+  <text x="754" y="346" class="label">k3s — url-shortener</text>
+  <text x="754" y="368" class="sub">runs the exact image Jenkins</text>
+  <text x="754" y="384" class="sub">built and tested · + Redis</text>
 
-  <rect class="box" x="704" y="248" width="272" height="74" rx="8"/>
-  <text x="724" y="274" class="label">Ansible</text>
-  <text x="724" y="292" class="sub">installs Jenkins, Docker, AWS CLI</text>
-  <text x="724" y="308" class="sub">admin user from Ansible Vault</text>
+  <rect class="box" x="734" y="430" width="262" height="60" rx="8"/>
+  <text x="754" y="455" class="label">Pulse app + monitoring</text>
+  <text x="754" y="473" class="sub">backend (process) · Grafana/Prometheus/Loki</text>
 
-  <rect class="boxaws" x="704" y="350" width="272" height="96" rx="8"/>
-  <text x="724" y="376" class="label">Jenkins (port 8080)</text>
-  <text x="724" y="398" class="sub">pipeline: build images →</text>
-  <text x="724" y="416" class="sub">run 66 tests →</text>
-  <text x="724" y="434" class="sub">push to ECR (optional)</text>
+  <path class="flowb" d="M820,300 L820,318" marker-end="url(#ab)"/>
+  <path class="flowg" d="M820,410 L820,428" marker-end="url(#ag)"/>
 
-  <rect class="box" x="704" y="476" width="272" height="58" rx="8"/>
-  <text x="724" y="500" class="label">Amazon ECR</text>
-  <text x="724" y="518" class="sub">image registry (account ID = variable)</text>
-
-  <!-- aws flows -->
-  <path class="flowo" d="M840,220 L840,246" marker-end="url(#ao)"/>
-  <path class="flowo" d="M840,322 L840,348" marker-end="url(#ao)"/>
-  <path class="flowo" d="M840,446 L840,474" marker-end="url(#ao)"/>
-
-  <!-- ===================== shared CI ===================== -->
-  <rect class="box" x="40" y="610" width="960" height="64" rx="8"/>
-  <text x="60" y="636" class="label">GitHub Actions (.github/workflows/ci.yml)</text>
-  <text x="60" y="656" class="sub">runs the 66 tests on every push · builds + pushes images to ECR when AWS secrets are configured (skips cleanly otherwise)</text>
-
-  <text x="40" y="710" class="sub">External integrations: GitHub API (DORA metrics) · monitored URLs (uptime checks). The two worlds are independent — neither depends on the other to run.</text>
+  <!-- bottom note -->
+  <rect class="box" x="40" y="610" width="980" height="64" rx="8"/>
+  <text x="60" y="636" class="label">The dependency is real</text>
+  <text x="60" y="656" class="sub">k3s only runs an image that Jenkins built and tested. If the pipeline is red, there is no artifact, and deploy-local.sh refuses. GitHub Actions also runs the 66 tests on every push.</text>
 </svg>

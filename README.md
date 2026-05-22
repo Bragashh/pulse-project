@@ -6,22 +6,21 @@ and roll back services from a dashboard, backed by live observability
 AWS toolchain — provisioned with Terraform, configured with Ansible — that
 stands up a Jenkins CI/CD pipeline.
 
+This README is a step-by-step operator guide. Run the commands in order.
+
 ---
 
 ## Architecture
 
 ![Pulse architecture](docs/architecture.svg)
 
-The application (left) runs locally on k3s with a docker-compose observability
-stack. The AWS toolchain (right) is provisioned with Terraform and configured
-with Ansible to run a Jenkins pipeline. The two are independent — neither needs
-the other to run.
+The Jenkins pipeline on AWS builds and tests the image, then archives it. The local `deploy-local.sh` checks the build passed, pulls that exact image, and deploys it to k3s — so the cloud CI and the local cluster genuinely depend on each other.
 
 ---
 
 ## Quick Start (local app)
 
-Tested on Ubuntu 24.04 with at least 4 GB RAM. Every command included —
+Tested on Ubuntu 22.04 / 24.04 with at least 4 GB RAM. Every command included —
 assumes a fresh machine.
 
 ```bash
@@ -64,97 +63,76 @@ Stop everything:
 
 ---
 
-## Quick Start (AWS: Terraform → Ansible → Jenkins)
+## Quick Start (AWS CI/CD: Terraform → Ansible → Jenkins → k3s)
 
-This stands up one EC2 on AWS and configures Jenkins on it. The application
-itself stays local (above); this part demonstrates the infrastructure and CI/CD
-toolchain.
+This is the connected pipeline. Terraform creates an EC2, Ansible installs
+Jenkins on it, the Jenkins pipeline builds and tests the images and archives
+them, and a local script pulls the tested image and deploys it to your k3s.
+**k3s only ever runs an image that Jenkins built and tested.**
 
-### Step 1 — AWS credentials
+### Step 1 — Provision + configure (one script)
 
-Provide AWS credentials in the current shell (never committed):
+`provision-aws.sh` prompts for your AWS credentials (used for this shell session
+only, never written to disk), runs Terraform to create the EC2, writes the IP
+into the Ansible inventory, and runs Ansible to install Jenkins:
 
 ```bash
-export AWS_ACCESS_KEY_ID=your-key-id
-export AWS_SECRET_ACCESS_KEY=your-secret
+./provision-aws.sh
 ```
 
-### Step 2 — Provision the EC2 with Terraform
+> Already ran `aws configure`? Just press Enter at the credential prompt and your
+> existing credentials are used.
+
+When it finishes it prints the Jenkins URL, e.g. `http://<ec2-ip>:8080`.
+
+### Step 2 — Run the pipeline in Jenkins
+
+Open `http://<ec2-ip>:8080` and log in with **admin / admin**. Run the
+`pulse-pipeline` job. It checks out the repo, runs the 66 backend tests, builds
+the images, and — on success — archives them as downloadable artifacts. A green
+build is required for the next step.
+
+### Step 3 — Deploy the tested image to local k3s
+
+On your local machine:
+
+```bash
+JENKINS_URL=http://<ec2-ip>:8080 ./deploy-local.sh
+```
+
+This checks that the latest Jenkins build passed, downloads the image artifact,
+imports it into k3s, and deploys it. If the build is not green, it refuses to
+deploy — that's the dependency made real.
+
+### Step 4 — Tear down (when finished)
 
 ```bash
 cd terraform
+terraform destroy         # type 'yes' — nothing is retained, no Elastic IP
+```
+
+A `t3.small` for an hour of testing costs only a few cents.
+
+### Manual alternative (if you prefer not to use the script)
+
+```bash
+# credentials
+export AWS_ACCESS_KEY_ID=...    # or run: aws configure
+export AWS_SECRET_ACCESS_KEY=...
+
+# terraform
+cd terraform
 cp terraform.tfvars.example terraform.tfvars
-#   open terraform.tfvars and set region / key_name / public_key_path if needed
+terraform init && terraform apply
 
-terraform init
-terraform apply           
-```
-
-When it finishes, note the outputs:
-
-```bash
-terraform output jenkins_ip      # the EC2 public IP
-terraform output jenkins_url     # http://<ip>:8080
-```
-
-### Step 3 — Configure Jenkins with Ansible
-
-```bash
+# ansible
 cd ../ansible
-
-# Create the vault key file (demo password — see "Ansible Vault" below)
-echo 'pulse-demo-vault-2026' > .vault_pass
-chmod 600 .vault_pass
-
-# Install the required Ansible collections
 ansible-galaxy collection install -r requirements.yml
-
-# Point the inventory at the EC2 created
 cp inventory/jenkins.ini.example inventory/jenkins.ini
 JENKINS_IP=$(terraform -chdir=../terraform output -raw jenkins_ip)
 sed -i "s/JENKINS_EC2_IP/${JENKINS_IP}/" inventory/jenkins.ini
-
-# Run the playbook
 ansible-playbook playbook.yml
 ```
-
-Ansible installs Java, Docker, the AWS CLI, and Jenkins; skips the setup wizard;
-installs the Git + pipeline plugins; and seeds an `admin` user plus a
-`pulse-pipeline` job from this repo's `Jenkinsfile`.
-
-### Step 4 — Open Jenkins
-
-Open the `jenkins_url` from Step 2 (`http://<ip>:8080`) and log in:
-
-- **User:** `admin`
-- **Password:** `admin`
-
-Run the `pulse-pipeline` job. It checks out the repo, runs the 66 backend tests,
-builds the three images, and — if you set a real `ECR_REGISTRY` (see below) —
-pushes them to ECR. 
-
-### Step 5 — Tear down (when finished)
-
-```bash
-cd ../terraform
-terraform destroy         
-```
-
----
-
-## Pushing images to ECR (optional)
-
-The Jenkins pipeline builds and tests by default. To also push images to your
-own ECR, set these as environment variables on the Jenkins job (Manage Jenkins →
-the job's configuration, or as global env vars):
-
-```
-ECR_REGISTRY = <your-account-id>.dkr.ecr.<region>.amazonaws.com
-AWS_REGION   = <your-region>
-```
-
-Leave them unset (or as `CHANGE_ME`) and the push stage skips cleanly while
-build + test still run.
 
 ---
 
@@ -167,20 +145,6 @@ source .venv/bin/activate
 pip install -r requirements.txt
 python -m pytest -v          # 66 tests
 ```
-
----
-
-## Ansible Vault
-
-The Jenkins admin password is stored encrypted with Ansible Vault in
-`ansible/group_vars/all/vault.yml` (committed, AES256). The vault **password**
-is never committed — `.vault_pass` is gitignored, and you create it in Step 3.
-
-> The values in this vault are **demonstration** credentials (`admin` / `admin`)
-> and the vault password (`pulse-demo-vault-2026`) is published here on purpose,
-> so the project can be graded and run. This demonstrates the Vault mechanism
-> without protecting anything sensitive — real secrets would use a password
-> supplied out-of-band, not written in a README.
 
 ---
 
@@ -221,9 +185,21 @@ The observability stack provides:
 | Orchestration | k3s (lightweight Kubernetes) |
 | Containers | Docker, docker-compose |
 | Infrastructure as code | Terraform (modular) |
-| Configuration management | Ansible (+ Ansible Vault) |
+| Configuration management | Ansible |
 | CI/CD | Jenkins (pipeline on AWS) + GitHub Actions (tests on every push) |
 | Tests | pytest — 66 tests covering routes, DB, deploy/promote/rollback |
+
+---
+
+## Course requirements mapping
+
+| # | Requirement | Where it's met |
+| --- | --- | --- |
+| 1 | Create machines with Terraform | `terraform/` — provisions the Jenkins EC2 (parameterised, no EIP) |
+| 2 | Configure machines with Ansible | `ansible/` — installs + configures Jenkins via the `jenkins` role |
+| 3 | CI/CD (Jenkins preferred) | Jenkins pipeline on AWS builds + tests + archives the image; `deploy-local.sh` deploys it to k3s; GitHub Actions also runs tests on push |
+| 4 | Containerised app (docker-compose or k8s) | App runs on k3s; monitoring via docker-compose; all services have Dockerfiles |
+| 5 | README explaining how to run / tech / what it does | This file |
 
 ---
 
@@ -261,12 +237,14 @@ pulse-project/
 │   ├── ansible.cfg
 │   ├── requirements.yml
 │   ├── inventory/jenkins.ini.example
-│   ├── group_vars/all/vault.yml   (encrypted)
+│   ├── group_vars/all.yml         (Jenkins admin user/password)
 │   └── roles/jenkins/
-├── .github/workflows/ci.yml  Tests on push, optional ECR push
-├── Jenkinsfile               Pipeline: build → 66 tests → push to ECR
-├── docs/                     Architecture diagram, k3s setup notes
+├── .github/workflows/ci.yml  Runs the 66 tests on every push
+├── Jenkinsfile               Pipeline: build → 66 tests → save + archive image
+├── docs/architecture.svg     Architecture diagram
 ├── setup.sh                  One-time: install all prerequisites
+├── provision-aws.sh          Prompt for creds → Terraform → Ansible (one command)
+├── deploy-local.sh           Pull the Jenkins-tested image → deploy to k3s
 ├── start.sh                  Bring the local stack up
 ├── stop.sh                   Bring the local stack down
 └── simulate-traffic.sh       Continuous traffic generation

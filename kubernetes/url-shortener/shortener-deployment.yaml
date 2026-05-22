@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: url-shortener
-          image: url-shortener:dev
+          image: pulse-url-shortener:latest
           imagePullPolicy: Never
           ports:
             - containerPort: 8000
