@@ -1,0 +1,682 @@
+import importlib
+import pytest
+
+
+@pytest.fixture
+def client(tmp_path, monkeypatch):
+    """
+    Provides a test client for the Flask app with an isolated temp database.
+    Each test gets a fresh DB file that's cleaned up automatically.
+    """
+    test_db_path = tmp_path / "test_pulse.db"
+    monkeypatch.setenv("PULSE_DB_PATH", str(test_db_path))
+
+    # Reload db module so it picks up the new env var path
+    import db
+    importlib.reload(db)
+
+    # Reload app so it uses the reloaded db module
+    import app
+    importlib.reload(app)
+
+    app.app.config["TESTING"] = True
+    with app.app.test_client() as client:
+        yield client
+
+
+# --- /health ---
+
+def test_health_endpoint_returns_200(client):
+    """The /health endpoint should always return 200 OK."""
+    response = client.get("/health")
+    assert response.status_code == 200
+
+
+def test_health_endpoint_returns_expected_json(client):
+    """The /health endpoint should return the expected JSON shape."""
+    response = client.get("/health")
+    data = response.get_json()
+    assert data["status"] == "ok"
+    assert data["service"] == "pulse-backend"
+
+
+# --- / (index) ---
+
+def test_index_endpoint_returns_200(client):
+    """The root endpoint should return 200 OK."""
+    response = client.get("/")
+    assert response.status_code == 200
+
+
+def test_index_endpoint_returns_message(client):
+    """The root endpoint should return a message field."""
+    response = client.get("/")
+    data = response.get_json()
+    assert "message" in data
+
+
+# --- /metrics ---
+
+def test_metrics_endpoint_returns_200(client):
+    """The /metrics endpoint should return 200 OK."""
+    response = client.get("/metrics")
+    assert response.status_code == 200
+
+
+def test_metrics_endpoint_has_expected_keys(client):
+    """The /metrics endpoint should have cpu, memory, and disk sections."""
+    response = client.get("/metrics")
+    data = response.get_json()
+    assert "cpu" in data
+    assert "memory" in data
+    assert "disk" in data
+
+
+def test_metrics_cpu_has_percent(client):
+    """CPU section should report percent as a number."""
+    response = client.get("/metrics")
+    data = response.get_json()
+    assert "percent" in data["cpu"]
+    assert isinstance(data["cpu"]["percent"], (int, float))
+
+
+def test_metrics_memory_has_required_fields(client):
+    """Memory section should include total, used, and percent."""
+    response = client.get("/metrics")
+    data = response.get_json()
+    assert "total" in data["memory"]
+    assert "used" in data["memory"]
+    assert "percent" in data["memory"]
+
+
+def test_metrics_disk_has_required_fields(client):
+    """Disk section should include total, used, and percent."""
+    response = client.get("/metrics")
+    data = response.get_json()
+    assert "total" in data["disk"]
+    assert "used" in data["disk"]
+    assert "percent" in data["disk"]
+
+
+# --- /score ---
+
+def test_score_endpoint_returns_200(client):
+    """The /score endpoint should return 200 OK."""
+    response = client.get("/score")
+    assert response.status_code == 200
+
+
+def test_score_endpoint_returns_score_in_range(client):
+    """The /score endpoint should return a score between 0 and 100."""
+    response = client.get("/score")
+    data = response.get_json()
+    assert "score" in data
+    assert 0 <= data["score"] <= 100
+
+
+def test_score_endpoint_returns_status(client):
+    """The /score endpoint should return a status field."""
+    response = client.get("/score")
+    data = response.get_json()
+    assert "status" in data
+    assert data["status"] in ("healthy", "degraded", "critical")
+
+
+# --- /uptime ---
+
+def test_uptime_endpoint_returns_200(client, mocker):
+    """The /uptime endpoint should return 200 even if all upstream services are mocked as up."""
+    mock_response = mocker.Mock()
+    mock_response.status_code = 200
+    mocker.patch("app.requests.get", return_value=mock_response)
+
+    response = client.get("/uptime")
+    assert response.status_code == 200
+
+
+def test_uptime_returns_services_list(client, mocker):
+    """The /uptime endpoint should return a list of services."""
+    mock_response = mocker.Mock()
+    mock_response.status_code = 200
+    mocker.patch("app.requests.get", return_value=mock_response)
+
+    response = client.get("/uptime")
+    data = response.get_json()
+    assert "services" in data
+    assert isinstance(data["services"], list)
+    assert len(data["services"]) == 3  # Google, GitHub, Gitea
+
+
+def test_uptime_marks_services_up_when_200(client, mocker):
+    """All services should be marked 'up' when the mock returns 200."""
+    mock_response = mocker.Mock()
+    mock_response.status_code = 200
+    mocker.patch("app.requests.get", return_value=mock_response)
+
+    response = client.get("/uptime")
+    data = response.get_json()
+    for service in data["services"]:
+        assert service["status"] == "up"
+
+
+def test_uptime_marks_services_down_on_exception(client, mocker):
+    """Services should be marked 'down' when the request raises an exception."""
+    mocker.patch("app.requests.get", side_effect=Exception("Connection refused"))
+
+    response = client.get("/uptime")
+    data = response.get_json()
+    for service in data["services"]:
+        assert service["status"] == "down"
+        assert "error" in service
+
+
+# --- /dora ---
+
+def test_dora_endpoint_returns_200(client, mocker):
+    """The /dora endpoint should return 200 with mocked GitHub API."""
+    mock_response = mocker.Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = []  # Empty list of commits
+    mocker.patch("app.requests.get", return_value=mock_response)
+
+    response = client.get("/dora")
+    assert response.status_code == 200
+
+
+def test_dora_handles_empty_commit_list(client, mocker):
+    """The /dora endpoint should return zero commits when GitHub returns empty list."""
+    mock_response = mocker.Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = []
+    mocker.patch("app.requests.get", return_value=mock_response)
+
+    response = client.get("/dora")
+    data = response.get_json()
+    assert data["deployment_frequency"]["commits_last_7_days"] == 0
+
+
+def test_dora_handles_rate_limit_response(client, mocker):
+    """The /dora endpoint should not crash if GitHub returns a non-list (rate limit) response."""
+    mock_response = mocker.Mock()
+    mock_response.status_code = 403
+    mock_response.json.return_value = {"message": "API rate limit exceeded"}
+    mocker.patch("app.requests.get", return_value=mock_response)
+
+    response = client.get("/dora")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["deployment_frequency"]["commits_last_7_days"] == 0
+    assert data["change_failure_rate"]["total_runs"] == 0
+
+
+# --- /services CRUD ---
+
+def test_list_services_empty_initially(client):
+    """A fresh database returns an empty services list."""
+    response = client.get("/services")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data == {"services": []}
+
+
+def test_create_service_returns_201(client):
+    """Creating a service returns 201 with the new service data."""
+    response = client.post("/services", json={
+        "name": "Google",
+        "url": "https://www.google.com"
+    })
+    assert response.status_code == 201
+    data = response.get_json()
+    assert data["name"] == "Google"
+    assert data["url"] == "https://www.google.com"
+    assert "id" in data
+
+
+def test_create_service_then_list_includes_it(client):
+    """A created service should appear in the list."""
+    client.post("/services", json={
+        "name": "Google",
+        "url": "https://www.google.com"
+    })
+
+    response = client.get("/services")
+    data = response.get_json()
+    assert len(data["services"]) == 1
+    assert data["services"][0]["name"] == "Google"
+
+
+def test_create_service_rejects_missing_name(client):
+    """POST without a name should return 400."""
+    response = client.post("/services", json={"url": "https://www.google.com"})
+    assert response.status_code == 400
+    assert "name" in response.get_json()["error"].lower()
+
+
+def test_create_service_rejects_missing_url(client):
+    """POST without a url should return 400."""
+    response = client.post("/services", json={"name": "Google"})
+    assert response.status_code == 400
+    assert "url" in response.get_json()["error"].lower()
+
+
+def test_create_service_rejects_invalid_url(client):
+    """POST with a non-http url should return 400."""
+    response = client.post("/services", json={
+        "name": "Google",
+        "url": "not-a-real-url"
+    })
+    assert response.status_code == 400
+
+
+def test_create_service_rejects_duplicate_name(client):
+    """Creating two services with the same name should return 409."""
+    client.post("/services", json={
+        "name": "Google",
+        "url": "https://www.google.com"
+    })
+    response = client.post("/services", json={
+        "name": "Google",
+        "url": "https://www.google.com.au"
+    })
+    assert response.status_code == 409
+
+
+def test_delete_service_returns_200(client):
+    """Deleting an existing service returns 200."""
+    create_response = client.post("/services", json={
+        "name": "Google",
+        "url": "https://www.google.com"
+    })
+    service_id = create_response.get_json()["id"]
+
+    response = client.delete(f"/services/{service_id}")
+    assert response.status_code == 200
+    assert response.get_json()["deleted"] is True
+
+
+def test_delete_service_removes_from_list(client):
+    """A deleted service no longer appears in the list."""
+    create_response = client.post("/services", json={
+        "name": "Google",
+        "url": "https://www.google.com"
+    })
+    service_id = create_response.get_json()["id"]
+
+    client.delete(f"/services/{service_id}")
+
+    response = client.get("/services")
+    assert response.get_json()["services"] == []
+
+
+def test_delete_nonexistent_service_returns_404(client):
+    """Deleting a non-existent service returns 404."""
+    response = client.delete("/services/999")
+    assert response.status_code == 404
+
+
+def test_restore_brings_service_back(client):
+    """Restoring a deleted service makes it visible again."""
+    create_response = client.post("/services", json={
+        "name": "Google",
+        "url": "https://www.google.com"
+    })
+    service_id = create_response.get_json()["id"]
+    client.delete(f"/services/{service_id}")
+
+    restore_response = client.post(f"/services/{service_id}/restore")
+    assert restore_response.status_code == 200
+
+    list_response = client.get("/services")
+    assert len(list_response.get_json()["services"]) == 1
+
+
+def test_restore_nonexistent_returns_404(client):
+    """Restoring a service that doesn't exist returns 404."""
+    response = client.post("/services/999/restore")
+    assert response.status_code == 404
+
+
+def test_can_recreate_service_after_delete(client):
+    """After soft-deleting a service, you should be able to create one with the same name."""
+    create1 = client.post("/services", json={
+        "name": "Google",
+        "url": "https://www.google.com"
+    })
+    service_id = create1.get_json()["id"]
+    client.delete(f"/services/{service_id}")
+
+    create2 = client.post("/services", json={
+        "name": "Google",
+        "url": "https://www.google.com.au"
+    })
+    assert create2.status_code == 201
+    assert create2.get_json()["id"] != service_id
+
+# --- /services/deploy ---
+
+def test_deploy_endpoint_returns_202(client, mocker):
+    """Deploying a service returns 202 with deployment info."""
+    mocker.patch("app.deployer.deploy_service", return_value={
+        "deployment": "test-svc",
+        "service": "test-svc",
+        "namespace": "pulse-deployed",
+        "node_port": 31000,
+    })
+    # Don't actually start the polling thread
+    mocker.patch("app.threading.Thread")
+
+    response = client.post("/services/deploy", json={
+        "name": "test-svc",
+        "image": "nginx",
+        "port": 80,
+        "replicas": 1,
+        "environment": "staging",
+    })
+    assert response.status_code == 202
+    data = response.get_json()
+    assert data["name"] == "test-svc"
+    assert data["status"] == "deploying"
+    assert data["node_port"] == 31000
+
+
+def test_deploy_rejects_missing_name(client):
+    """Deploy requires a name."""
+    response = client.post("/services/deploy", json={
+        "image": "nginx",
+        "port": 80,
+    })
+    assert response.status_code == 400
+
+
+def test_deploy_rejects_invalid_port(client):
+    """Deploy requires a valid port."""
+    response = client.post("/services/deploy", json={
+        "name": "test-svc",
+        "image": "nginx",
+        "port": "not a number",
+    })
+    assert response.status_code == 400
+
+
+def test_deploy_rejects_invalid_environment(client):
+    """Deploy rejects environments other than staging/production."""
+    response = client.post("/services/deploy", json={
+        "name": "test-svc",
+        "image": "nginx",
+        "port": 80,
+        "environment": "elsewhere",
+    })
+    assert response.status_code == 400
+
+
+def test_deploy_rejects_duplicate_name(client, mocker):
+    """Cannot deploy two services with the same name in same environment."""
+    mocker.patch("app.deployer.deploy_service", return_value={
+        "deployment": "dupe", "service": "dupe", "namespace": "pulse-deployed", "node_port": 31000,
+    })
+    mocker.patch("app.threading.Thread")
+
+    client.post("/services/deploy", json={
+        "name": "dupe", "image": "nginx", "port": 80, "environment": "staging",
+    })
+    response = client.post("/services/deploy", json={
+        "name": "dupe", "image": "nginx", "port": 80, "environment": "staging",
+    })
+    assert response.status_code == 409
+
+
+def test_deploy_handles_kubernetes_failure(client, mocker):
+    """If deployer raises, the endpoint returns 500 and marks deployment failed."""
+    mocker.patch("app.deployer.deploy_service", side_effect=Exception("k8s unreachable"))
+
+    response = client.post("/services/deploy", json={
+        "name": "broken", "image": "nginx", "port": 80, "environment": "staging",
+    })
+    assert response.status_code == 500
+
+
+# --- /deployments ---
+
+def test_list_deployments_empty_initially(client):
+    """No deployed services means empty list."""
+    response = client.get("/deployments")
+    assert response.status_code == 200
+    assert response.get_json() == {"deployed_services": []}
+
+
+def test_list_deployments_includes_deployed(client, mocker):
+    """A deployed service shows up in the list."""
+    mocker.patch("app.deployer.deploy_service", return_value={
+        "deployment": "listed", "service": "listed", "namespace": "pulse-deployed", "node_port": 31001,
+    })
+    mocker.patch("app.threading.Thread")
+
+    client.post("/services/deploy", json={
+        "name": "listed", "image": "nginx", "port": 80, "environment": "staging",
+    })
+
+    response = client.get("/deployments")
+    data = response.get_json()
+    assert len(data["deployed_services"]) == 1
+    assert data["deployed_services"][0]["name"] == "listed"
+
+
+def test_delete_deployment_returns_200(client, mocker):
+    """Deleting a deployed service returns 200."""
+    mocker.patch("app.deployer.deploy_service", return_value={
+        "deployment": "tbd", "service": "tbd", "namespace": "pulse-deployed", "node_port": 31002,
+    })
+    mocker.patch("app.threading.Thread")
+    mocker.patch("app.deployer.delete_deployment", return_value=True)
+
+    client.post("/services/deploy", json={
+        "name": "tbd", "image": "nginx", "port": 80, "environment": "staging",
+    })
+
+    response = client.delete("/deployments/tbd?environment=staging")
+    assert response.status_code == 200
+    assert response.get_json()["deleted"] is True
+
+
+def test_delete_nonexistent_deployment_returns_404(client):
+    """Deleting a non-existent deployed service returns 404."""
+    response = client.delete("/deployments/never-existed?environment=staging")
+    assert response.status_code == 404
+
+# --- /deployments/<name>/promote ---
+
+def test_promote_deployment_returns_202(client, mocker):
+    """Promoting an existing staging deployment returns 202."""
+    mocker.patch("app.deployer.deploy_service", return_value={
+        "deployment": "promo", "service": "promo", "namespace": "pulse-deployed", "node_port": 31100,
+    })
+    mocker.patch("app.threading.Thread")
+
+    # First create a staging deployment
+    client.post("/services/deploy", json={
+        "name": "promo", "image": "nginx:1.0", "port": 80, "environment": "staging",
+    })
+
+    response = client.post("/deployments/promo/promote")
+    assert response.status_code == 202
+    data = response.get_json()
+    assert data["environment"] == "production"
+    assert data["image"] == "nginx:1.0"
+    assert data["deployment_name"] == "promo-prod"
+
+
+def test_promote_uses_staging_image(client, mocker):
+    """The promoted version should use the same image as staging."""
+    deploy_calls = []
+    def capture_deploy(name, image, port, replicas):
+        deploy_calls.append({"name": name, "image": image, "port": port, "replicas": replicas})
+        return {"deployment": name, "service": name, "namespace": "pulse-deployed", "node_port": 31000}
+
+    mocker.patch("app.deployer.deploy_service", side_effect=capture_deploy)
+    mocker.patch("app.threading.Thread")
+
+    client.post("/services/deploy", json={
+        "name": "imagetest", "image": "specific-image:v3", "port": 8080, "replicas": 3, "environment": "staging",
+    })
+    client.post("/deployments/imagetest/promote")
+
+    # Two deploys: staging (imagetest) then production (imagetest-prod), both with same image
+    assert len(deploy_calls) == 2
+    assert deploy_calls[1]["name"] == "imagetest-prod"
+    assert deploy_calls[1]["image"] == "specific-image:v3"
+    assert deploy_calls[1]["port"] == 8080
+    assert deploy_calls[1]["replicas"] == 3
+
+
+def test_promote_nonexistent_returns_404(client):
+    """Cannot promote a service that doesn't exist in staging."""
+    response = client.post("/deployments/never-existed/promote")
+    assert response.status_code == 404
+
+
+def test_promote_when_production_already_exists_returns_409(client, mocker):
+    """Cannot promote if a production version already exists."""
+    mocker.patch("app.deployer.deploy_service", return_value={
+        "deployment": "dupe", "service": "dupe", "namespace": "pulse-deployed", "node_port": 31200,
+    })
+    mocker.patch("app.threading.Thread")
+
+    client.post("/services/deploy", json={
+        "name": "dupe", "image": "nginx", "port": 80, "environment": "staging",
+    })
+    client.post("/deployments/dupe/promote")  # First promote — succeeds
+    response = client.post("/deployments/dupe/promote")  # Second — should 409
+    assert response.status_code == 409
+
+
+def test_promote_handles_kubernetes_failure(client, mocker):
+    """If the deployer raises during promotion, return 500."""
+    deploy_count = [0]
+    def fail_on_second(name, image, port, replicas):
+        deploy_count[0] += 1
+        if deploy_count[0] == 2:
+            raise Exception("k8s broke")
+        return {"deployment": name, "service": name, "namespace": "pulse-deployed", "node_port": 31300}
+
+    mocker.patch("app.deployer.deploy_service", side_effect=fail_on_second)
+    mocker.patch("app.threading.Thread")
+
+    client.post("/services/deploy", json={
+        "name": "willfail", "image": "nginx", "port": 80, "environment": "staging",
+    })
+    response = client.post("/deployments/willfail/promote")
+    assert response.status_code == 500
+
+# --- /deployments/<name>/history ---
+
+def test_history_returns_deployments(client, mocker):
+    """History endpoint returns deployment records in reverse chronological order."""
+    mocker.patch("app.deployer.deploy_service", return_value={
+        "deployment": "histtest", "service": "histtest", "namespace": "pulse-deployed", "node_port": 31400,
+    })
+    mocker.patch("app.threading.Thread")
+
+    # Deploy twice with different images
+    client.post("/services/deploy", json={
+        "name": "histtest", "image": "histtest:v1", "port": 80, "environment": "staging",
+    })
+    # Note: we'd normally rollback or redeploy here, but for the test the service constraints
+    # mean the second deploy attempt would 409. So we directly insert a second deployment row.
+    import db as db_module
+    svc = db_module.get_deployed_service_by_name("histtest", "staging")
+    db_module.add_deployment(svc["id"], "histtest:v2", "staging", status="healthy")
+
+    response = client.get("/deployments/histtest/history")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert len(data["history"]) >= 2
+
+
+def test_history_returns_404_for_nonexistent(client):
+    """History for a non-existent service returns 404."""
+    response = client.get("/deployments/never-existed/history")
+    assert response.status_code == 404
+
+
+# --- /deployments/<name>/rollback ---
+
+def test_rollback_returns_202(client, mocker):
+    """Rolling back to a historical deployment returns 202."""
+    mocker.patch("app.deployer.deploy_service", return_value={
+        "deployment": "rbtest", "service": "rbtest", "namespace": "pulse-deployed", "node_port": 31500,
+    })
+    mocker.patch("app.threading.Thread")
+
+    client.post("/services/deploy", json={
+        "name": "rbtest", "image": "rbtest:v1", "port": 80, "environment": "staging",
+    })
+
+    # Inject a second deployment so we have something to roll back to
+    import db as db_module
+    svc = db_module.get_deployed_service_by_name("rbtest", "staging")
+    older_id = db_module.add_deployment(svc["id"], "rbtest:v0", "staging", status="healthy")
+
+    response = client.post("/deployments/rbtest/rollback", json={
+        "deployment_id": older_id,
+        "environment": "staging",
+    })
+    assert response.status_code == 202
+    data = response.get_json()
+    assert data["rolled_back_to_image"] == "rbtest:v0"
+    assert data["status"] == "rolling_back"
+
+
+def test_rollback_uses_correct_image(client, mocker):
+    """Rollback should call deploy_service with the historical image."""
+    deploy_calls = []
+    def capture_deploy(name, image, port, replicas):
+        deploy_calls.append({"image": image})
+        return {"deployment": name, "service": name, "namespace": "pulse-deployed", "node_port": 31600}
+
+    mocker.patch("app.deployer.deploy_service", side_effect=capture_deploy)
+    mocker.patch("app.threading.Thread")
+
+    client.post("/services/deploy", json={
+        "name": "imgtest", "image": "imgtest:current", "port": 80, "environment": "staging",
+    })
+
+    import db as db_module
+    svc = db_module.get_deployed_service_by_name("imgtest", "staging")
+    target_id = db_module.add_deployment(svc["id"], "imgtest:old", "staging", status="healthy")
+
+    client.post("/deployments/imgtest/rollback", json={"deployment_id": target_id})
+
+    # The second deploy call (the rollback) should use the old image
+    assert len(deploy_calls) == 2
+    assert deploy_calls[1]["image"] == "imgtest:old"
+
+
+def test_rollback_requires_deployment_id(client):
+    """Rollback without a deployment_id returns 400."""
+    response = client.post("/deployments/whatever/rollback", json={})
+    assert response.status_code == 400
+
+
+def test_rollback_nonexistent_service_returns_404(client):
+    """Rolling back a non-existent service returns 404."""
+    response = client.post("/deployments/never-existed/rollback", json={
+        "deployment_id": 1,
+    })
+    assert response.status_code == 404
+
+
+def test_rollback_to_nonexistent_deployment_returns_404(client, mocker):
+    """Rolling back to a deployment_id that doesn't exist in history returns 404."""
+    mocker.patch("app.deployer.deploy_service", return_value={
+        "deployment": "rbnone", "service": "rbnone", "namespace": "pulse-deployed", "node_port": 31700,
+    })
+    mocker.patch("app.threading.Thread")
+
+    client.post("/services/deploy", json={
+        "name": "rbnone", "image": "nginx", "port": 80, "environment": "staging",
+    })
+
+    response = client.post("/deployments/rbnone/rollback", json={
+        "deployment_id": 99999,  # does not exist
+    })
+    assert response.status_code == 404

@@ -1,0 +1,23 @@
+#!groovy
+// Creates a pipeline job named "pulse-pipeline" on first boot if absent.
+// The pipeline definition itself lives in the repo's Jenkinsfile.
+import jenkins.model.*
+import org.jenkinsci.plugins.workflow.job.WorkflowJob
+import org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition
+import jenkins.plugins.git.GitSCMSource
+import hudson.plugins.git.*
+
+def instance = Jenkins.getInstance()
+def jobName = "pulse-pipeline"
+
+if (instance.getItem(jobName) == null) {
+    def job = instance.createProject(WorkflowJob, jobName)
+
+    def scm = new GitSCM("{{ pipeline_repo_url }}")
+    scm.branches = [new BranchSpec("*/{{ pipeline_repo_branch }}")]
+
+    def flowDefinition = new CpsScmFlowDefinition(scm, "Jenkinsfile")
+    flowDefinition.setLightweight(true)
+    job.setDefinition(flowDefinition)
+    job.save()
+}

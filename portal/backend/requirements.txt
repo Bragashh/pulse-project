@@ -1,0 +1,9 @@
+flask
+flask-cors
+psutil
+requests
+pytest
+pytest-flask
+pytest-mock
+prometheus-client
+kubernetes

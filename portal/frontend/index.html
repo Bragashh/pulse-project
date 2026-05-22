@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pulse — DevOps Monitor</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+    header { padding: 24px 40px; border-bottom: 1px solid #1e2330; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: 0.05em; color: #7dd3fc; }
+    header span { font-size: 0.85rem; color: #64748b; }
+    .container { padding: 40px; display: grid; gap: 32px; }
+    .section-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; margin-bottom: 16px; }
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .section-header .section-title { margin-bottom: 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+    .card { background: #1a1f2e; border: 1px solid #1e2330; border-radius: 12px; padding: 24px; }
+    .card-label { font-size: 0.75rem; color: #64748b; margin-bottom: 8px; }
+    .card-value { font-size: 2rem; font-weight: 700; color: #f1f5f9; }
+    .card-sub { font-size: 0.78rem; color: #64748b; margin-top: 4px; }
+    .score-card { background: #1a1f2e; border: 1px solid #1e2330; border-radius: 12px; padding: 32px; display: flex; align-items: center; gap: 32px; }
+    .score-number { font-size: 4rem; font-weight: 800; }
+    .score-healthy { color: #4ade80; }
+    .score-degraded { color: #facc15; }
+    .score-critical { color: #f87171; }
+    .score-label { font-size: 1rem; color: #94a3b8; }
+    .score-status { font-size: 1.2rem; font-weight: 600; margin-top: 4px; }
+    .uptime-grid { display: grid; gap: 12px; }
+    .uptime-row { background: #1a1f2e; border: 1px solid #1e2330; border-radius: 10px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .uptime-row-info { flex: 1; min-width: 0; }
+    .uptime-row-actions { display: flex; align-items: center; gap: 12px; }
+    .uptime-name { font-size: 0.9rem; font-weight: 600; }
+    .uptime-latency { font-size: 0.78rem; color: #64748b; margin-top: 2px; word-break: break-all; }
+    .badge { font-size: 0.7rem; font-weight: 600; padding: 3px 10px; border-radius: 99px; }
+    .badge.up, .badge.healthy { background: #052e16; color: #4ade80; }
+    .badge.down, .badge.failed { background: #2d0a0a; color: #f87171; }
+    .badge.degraded, .badge.deploying, .badge.pending { background: #1e1a05; color: #facc15; }
+    .badge.staging { background: #1e293b; color: #94a3b8; }
+    .badge.production { background: #1e2a3b; color: #7dd3fc; }
+    .dora-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+    .loading { color: #475569; font-size: 0.85rem; }
+    .refresh { font-size: 0.75rem; color: #475569; }
+
+    .btn {
+      background: #1a1f2e; color: #e2e8f0; border: 1px solid #1e2330;
+      padding: 8px 14px; border-radius: 8px; cursor: pointer;
+      font-size: 0.8rem; font-weight: 500; font-family: inherit;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn:hover { background: #252b3d; border-color: #334155; }
+    .btn-primary { background: #0369a1; border-color: #0369a1; color: #fff; }
+    .btn-primary:hover { background: #0284c7; border-color: #0284c7; }
+    .btn-danger { background: transparent; border-color: transparent; color: #64748b; padding: 4px 8px; }
+    .btn-danger:hover { background: #2d0a0a; color: #f87171; border-color: #2d0a0a; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
+      display: none; align-items: center; justify-content: center;
+      z-index: 100; backdrop-filter: blur(2px);
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal {
+      background: #1a1f2e; border: 1px solid #1e2330; border-radius: 12px;
+      padding: 28px; width: 100%; max-width: 480px; margin: 16px;
+    }
+    .modal h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 20px; color: #f1f5f9; }
+    .form-row { margin-bottom: 16px; }
+    .form-row.inline { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-row label {
+      display: block; font-size: 0.75rem; color: #94a3b8;
+      margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .form-row input, .form-row select {
+      width: 100%; background: #0f1117; border: 1px solid #1e2330;
+      border-radius: 8px; padding: 10px 12px; color: #e2e8f0;
+      font-size: 0.9rem; font-family: inherit;
+    }
+    .form-row input:focus, .form-row select:focus { outline: none; border-color: #0369a1; }
+    .form-error {
+      color: #f87171; font-size: 0.8rem; margin-top: 12px; min-height: 1em;
+    }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+<header>
+  <div style="display:flex;align-items:center;gap:12px">
+    <h1>⚡ Pulse</h1>
+    <span>DevOps Monitor</span>
+  </div>
+  <span class="refresh" id="last-refresh">Loading...</span>
+</header>
+
+<div class="container">
+
+  <div>
+    <div class="section-title">Health Score</div>
+    <div class="score-card">
+      <div class="score-number" id="score-number">—</div>
+      <div>
+        <div class="score-label">Overall System Health</div>
+        <div class="score-status" id="score-status">Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-title">Server Metrics</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-label">CPU Usage</div>
+        <div class="card-value" id="cpu">—</div>
+        <div class="card-sub">percent</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Memory Usage</div>
+        <div class="card-value" id="mem">—</div>
+        <div class="card-sub">percent</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Disk Usage</div>
+        <div class="card-value" id="disk">—</div>
+        <div class="card-sub">percent</div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-header">
+      <div class="section-title">Uptime</div>
+      <button class="btn btn-primary" id="open-add-modal">+ Add Service</button>
+    </div>
+    <div class="uptime-grid" id="uptime-grid">
+      <div class="loading">Loading services...</div>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-header">
+      <div class="section-title">Deployed Services</div>
+      <button class="btn btn-primary" id="open-deploy-modal">+ Deploy New Service</button>
+    </div>
+    <div class="uptime-grid" id="deployments-grid">
+      <div class="loading">Loading deployments...</div>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-title">DORA Metrics</div>
+    <div class="dora-grid">
+      <div class="card">
+        <div class="card-label">Commits (last 7 days)</div>
+        <div class="card-value" id="commits">—</div>
+        <div class="card-sub" id="per-day">per day</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Change Failure Rate</div>
+        <div class="card-value" id="failure-rate">—</div>
+        <div class="card-sub" id="runs-info">pipeline runs</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Add Service Modal -->
+<div class="modal-backdrop" id="add-modal-backdrop">
+  <div class="modal">
+    <h2>Add Service</h2>
+    <div class="form-row">
+      <label for="service-name">Name</label>
+      <input type="text" id="service-name" placeholder="e.g. Cloudflare" autocomplete="off" />
+    </div>
+    <div class="form-row">
+      <label for="service-url">URL</label>
+      <input type="text" id="service-url" placeholder="https://example.com" autocomplete="off" />
+    </div>
+    <div class="form-error" id="form-error"></div>
+    <div class="modal-actions">
+      <button class="btn" id="cancel-add">Cancel</button>
+      <button class="btn btn-primary" id="submit-add">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Deploy Service Modal -->
+<div class="modal-backdrop" id="deploy-modal-backdrop">
+  <div class="modal">
+    <h2>Deploy New Service</h2>
+    <div class="form-row">
+      <label for="deploy-name">Name</label>
+      <input type="text" id="deploy-name" placeholder="e.g. my-shortener" autocomplete="off" />
+    </div>
+    <div class="form-row">
+      <label for="deploy-image">Container Image</label>
+      <input type="text" id="deploy-image" placeholder="e.g. url-shortener:dev" autocomplete="off" />
+    </div>
+    <div class="form-row inline">
+      <div>
+        <label for="deploy-port">Port</label>
+        <input type="number" id="deploy-port" placeholder="8000" min="1" max="65535" />
+      </div>
+      <div>
+        <label for="deploy-replicas">Replicas</label>
+        <input type="number" id="deploy-replicas" placeholder="1" value="1" min="1" max="10" />
+      </div>
+    </div>
+    <div class="form-row">
+      <label for="deploy-environment">Environment</label>
+      <select id="deploy-environment">
+        <option value="staging">Staging</option>
+        <option value="production">Production</option>
+      </select>
+    </div>
+    <div class="form-error" id="deploy-error"></div>
+    <div class="modal-actions">
+      <button class="btn" id="cancel-deploy">Cancel</button>
+      <button class="btn btn-primary" id="submit-deploy">Deploy</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rollback Modal -->
+<div class="modal-backdrop" id="rollback-modal-backdrop">
+  <div class="modal" style="max-width: 540px">
+    <h2>Rollback Deployment</h2>
+    <div style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 16px">
+      Select a previous deployment to roll back to. The chosen image will be redeployed.
+    </div>
+    <div id="rollback-history" style="display: grid; gap: 8px; margin-bottom: 16px;">
+      <div class="loading">Loading history...</div>
+    </div>
+    <div class="form-error" id="rollback-error"></div>
+    <div class="modal-actions">
+      <button class="btn" id="cancel-rollback">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API = '';
+
+  async function fetchScore() {
+    const res = await fetch(API + '/score');
+    const data = await res.json();
+    const el = document.getElementById('score-number');
+    el.textContent = data.score;
+    el.className = 'score-number score-' + data.status;
+    document.getElementById('score-status').textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+  }
+
+  async function fetchMetrics() {
+    const res = await fetch(API + '/metrics');
+    const data = await res.json();
+    document.getElementById('cpu').textContent = data.cpu.percent + '%';
+    document.getElementById('mem').textContent = data.memory.percent + '%';
+    document.getElementById('disk').textContent = data.disk.percent + '%';
+  }
+
+  async function fetchUptime() {
+    const res = await fetch(API + '/uptime');
+    const data = await res.json();
+    const grid = document.getElementById('uptime-grid');
+    grid.innerHTML = '';
+
+    if (data.services.length === 0) {
+      grid.innerHTML = '<div class="loading">No services yet — click "Add Service" to get started.</div>';
+      return;
+    }
+
+    data.services.forEach(s => {
+      const row = document.createElement('div');
+      row.className = 'uptime-row';
+      row.innerHTML =
+        '<div class="uptime-row-info">' +
+          '<div class="uptime-name"></div>' +
+          '<div class="uptime-latency"></div>' +
+        '</div>' +
+        '<div class="uptime-row-actions">' +
+          '<span class="badge env-badge"></span>' +
+          '<span class="badge status-badge"></span>' +
+          '<button class="btn promote-btn" style="display:none" title="Promote to production">↑ Promote</button>' +
+          '<button class="btn btn-danger" title="Delete deployment">✕</button>' +
+        '</div>';
+
+      row.querySelector('.uptime-name').textContent = s.name;
+      row.querySelector('.uptime-latency').textContent =
+        (s.latency_ms ? s.latency_ms + 'ms' : 'N/A') + ' — ' + s.url;
+      const badge = row.querySelector('.badge');
+      badge.textContent = s.status;
+      badge.classList.add(s.status);
+
+      row.querySelector('.btn-danger').addEventListener('click', () => deleteService(s.name));
+      grid.appendChild(row);
+    });
+  }
+
+  async function fetchDeployments() {
+    const res = await fetch(API + '/deployments');
+    const data = await res.json();
+    const grid = document.getElementById('deployments-grid');
+    grid.innerHTML = '';
+
+    if (data.deployed_services.length === 0) {
+      grid.innerHTML = '<div class="loading">No deployed services yet — click "Deploy New Service" to get started.</div>';
+      return;
+    }
+
+    data.deployed_services.forEach(s => {
+      const row = document.createElement('div');
+      row.className = 'uptime-row';
+      row.innerHTML =
+        '<div class="uptime-row-info">' +
+          '<div class="uptime-name"></div>' +
+          '<div class="uptime-latency"></div>' +
+        '</div>' +
+        '<div class="uptime-row-actions">' +
+          '<span class="badge env-badge"></span>' +
+          '<span class="badge status-badge"></span>' +
+          '<button class="btn rollback-btn" title="Rollback">↺ Rollback</button>' +
+          '<button class="btn promote-btn" style="display:none" title="Promote to production">↑ Promote</button>' +
+          '<button class="btn btn-danger" title="Delete deployment">✕</button>' +
+        '</div>';
+
+      row.querySelector('.uptime-name').textContent = s.name;
+      row.querySelector('.uptime-latency').textContent =
+        s.image + ' — ' + s.replicas + ' replica' + (s.replicas === 1 ? '' : 's');
+
+      const envBadge = row.querySelector('.env-badge');
+      envBadge.textContent = s.environment;
+      envBadge.classList.add(s.environment);
+
+      const statusBadge = row.querySelector('.status-badge');
+      statusBadge.textContent = s.latest_status;
+      statusBadge.classList.add(s.latest_status);
+
+      // Show promote button only for staging services
+      if (s.environment === 'staging' && s.latest_status === 'healthy') {
+        const promoteBtn = row.querySelector('.promote-btn');
+        promoteBtn.style.display = 'inline-block';
+        promoteBtn.addEventListener('click', () => promoteDeployment(s.name));
+      }
+
+      row.querySelector('.rollback-btn').addEventListener('click', () => openRollbackModal(s.name, s.environment));
+      row.querySelector('.btn-danger').addEventListener('click', () => deleteDeployment(s.name, s.environment));
+      grid.appendChild(row);
+    });
+  }
+
+  async function fetchDora() {
+    const res = await fetch(API + '/dora');
+    const data = await res.json();
+    document.getElementById('commits').textContent = data.deployment_frequency.commits_last_7_days;
+    document.getElementById('per-day').textContent = data.deployment_frequency.per_day + ' per day';
+    document.getElementById('failure-rate').textContent = data.change_failure_rate.failure_rate_percent + '%';
+    document.getElementById('runs-info').textContent = data.change_failure_rate.total_runs + ' pipeline runs';
+  }
+
+  async function refresh() {
+    await Promise.all([fetchScore(), fetchMetrics(), fetchUptime(), fetchDeployments(), fetchDora()]);
+    document.getElementById('last-refresh').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+  }
+
+  // --- Add Service modal ---
+
+  const addModal = document.getElementById('add-modal-backdrop');
+  const addNameInput = document.getElementById('service-name');
+  const addUrlInput = document.getElementById('service-url');
+  const addErrorEl = document.getElementById('form-error');
+  const addSubmitBtn = document.getElementById('submit-add');
+
+  function openAddModal() {
+    addNameInput.value = '';
+    addUrlInput.value = '';
+    addErrorEl.textContent = '';
+    addModal.classList.add('show');
+    addNameInput.focus();
+  }
+
+  function closeAddModal() { addModal.classList.remove('show'); }
+
+  document.getElementById('open-add-modal').addEventListener('click', openAddModal);
+  document.getElementById('cancel-add').addEventListener('click', closeAddModal);
+  addModal.addEventListener('click', (e) => { if (e.target === addModal) closeAddModal(); });
+
+  [addNameInput, addUrlInput].forEach(input => {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submitAdd();
+      if (e.key === 'Escape') closeAddModal();
+    });
+  });
+
+  addSubmitBtn.addEventListener('click', submitAdd);
+
+  async function submitAdd() {
+    const name = addNameInput.value.trim();
+    const url = addUrlInput.value.trim();
+
+    if (!name || !url) {
+      addErrorEl.textContent = 'Both name and URL are required.';
+      return;
+    }
+
+    addSubmitBtn.disabled = true;
+    addErrorEl.textContent = '';
+
+    try {
+      const res = await fetch(API + '/services', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, url }),
+      });
+      if (res.status === 201) {
+        closeAddModal();
+        await refresh();
+      } else {
+        const data = await res.json();
+        addErrorEl.textContent = data.error || 'Something went wrong.';
+      }
+    } catch (e) {
+      addErrorEl.textContent = 'Network error: ' + e.message;
+    } finally {
+      addSubmitBtn.disabled = false;
+    }
+  }
+
+  async function deleteService(name) {
+    if (!confirm('Delete service "' + name + '"?')) return;
+    const listRes = await fetch(API + '/services');
+    const listData = await listRes.json();
+    const service = listData.services.find(s => s.name === name);
+    if (!service) { alert('Service not found.'); await refresh(); return; }
+    const res = await fetch(API + '/services/' + service.id, { method: 'DELETE' });
+    if (res.ok) await refresh();
+    else alert('Failed to delete service.');
+  }
+
+  // --- Deploy modal ---
+
+  const deployModal = document.getElementById('deploy-modal-backdrop');
+  const deployNameInput = document.getElementById('deploy-name');
+  const deployImageInput = document.getElementById('deploy-image');
+  const deployPortInput = document.getElementById('deploy-port');
+  const deployReplicasInput = document.getElementById('deploy-replicas');
+  const deployEnvInput = document.getElementById('deploy-environment');
+  const deployErrorEl = document.getElementById('deploy-error');
+  const deploySubmitBtn = document.getElementById('submit-deploy');
+
+  function openDeployModal() {
+    deployNameInput.value = '';
+    deployImageInput.value = '';
+    deployPortInput.value = '';
+    deployReplicasInput.value = '1';
+    deployEnvInput.value = 'staging';
+    deployErrorEl.textContent = '';
+    deployModal.classList.add('show');
+    deployNameInput.focus();
+  }
+
+  function closeDeployModal() { deployModal.classList.remove('show'); }
+
+  document.getElementById('open-deploy-modal').addEventListener('click', openDeployModal);
+  document.getElementById('cancel-deploy').addEventListener('click', closeDeployModal);
+  deployModal.addEventListener('click', (e) => { if (e.target === deployModal) closeDeployModal(); });
+
+  document.querySelectorAll('#deploy-modal-backdrop input, #deploy-modal-backdrop select').forEach(input => {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeDeployModal();
+    });
+  });
+
+  deploySubmitBtn.addEventListener('click', submitDeploy);
+
+  async function submitDeploy() {
+    const name = deployNameInput.value.trim();
+    const image = deployImageInput.value.trim();
+    const port = parseInt(deployPortInput.value, 10);
+    const replicas = parseInt(deployReplicasInput.value, 10) || 1;
+    const environment = deployEnvInput.value;
+
+    if (!name || !image || !port) {
+      deployErrorEl.textContent = 'Name, image, and port are required.';
+      return;
+    }
+
+    deploySubmitBtn.disabled = true;
+    deployErrorEl.textContent = '';
+
+    try {
+      const res = await fetch(API + '/services/deploy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, image, port, replicas, environment }),
+      });
+      if (res.status === 202) {
+        closeDeployModal();
+        await refresh();
+      } else {
+        const data = await res.json();
+        deployErrorEl.textContent = data.error || 'Deployment failed.';
+      }
+    } catch (e) {
+      deployErrorEl.textContent = 'Network error: ' + e.message;
+    } finally {
+      deploySubmitBtn.disabled = false;
+    }
+  }
+
+  async function promoteDeployment(name) {
+    if (!confirm('Promote "' + name + '" from staging to production? This will deploy the same image to production.')) return;
+    const res = await fetch(API + '/deployments/' + name + '/promote', { method: 'POST' });
+    if (res.ok) {
+      await refresh();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert('Failed to promote: ' + (data.error || 'unknown error'));
+    }
+  }
+
+  async function deleteDeployment(name, environment) {
+    if (!confirm('Delete deployed service "' + name + '" (' + environment + ')? This will remove it from Kubernetes.')) return;
+    const res = await fetch(API + '/deployments/' + name + '?environment=' + environment, { method: 'DELETE' });
+    if (res.ok) await refresh();
+    else alert('Failed to delete deployment.');
+  }
+
+  // --- Rollback modal ---
+
+  const rollbackModal = document.getElementById('rollback-modal-backdrop');
+  const rollbackHistory = document.getElementById('rollback-history');
+  const rollbackError = document.getElementById('rollback-error');
+
+  let rollbackContext = null; // { name, environment }
+
+  async function openRollbackModal(name, environment) {
+    rollbackContext = { name, environment };
+    rollbackError.textContent = '';
+    rollbackHistory.innerHTML = '<div class="loading">Loading history...</div>';
+    rollbackModal.classList.add('show');
+
+    try {
+      const res = await fetch(API + '/deployments/' + name + '/history?environment=' + environment);
+      if (!res.ok) {
+        rollbackHistory.innerHTML = '<div class="loading">Failed to load history.</div>';
+        return;
+      }
+      const data = await res.json();
+      renderRollbackHistory(data.history);
+    } catch (e) {
+      rollbackHistory.innerHTML = '<div class="loading">Network error: ' + e.message + '</div>';
+    }
+  }
+
+  function renderRollbackHistory(history) {
+    rollbackHistory.innerHTML = '';
+    if (!history || history.length === 0) {
+      rollbackHistory.innerHTML = '<div class="loading">No deployment history yet.</div>';
+      return;
+    }
+
+    history.forEach((entry, idx) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'background: #0f1117; border: 1px solid #1e2330; border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px;';
+
+      const info = document.createElement('div');
+      info.style.cssText = 'flex: 1; min-width: 0;';
+
+      const imageEl = document.createElement('div');
+      imageEl.style.cssText = 'font-size: 0.85rem; color: #f1f5f9; word-break: break-all;';
+      imageEl.textContent = entry.image_tag;
+
+      const metaEl = document.createElement('div');
+      metaEl.style.cssText = 'font-size: 0.72rem; color: #64748b; margin-top: 4px;';
+      metaEl.textContent = entry.deployed_at + ' — id #' + entry.id;
+
+      info.appendChild(imageEl);
+      info.appendChild(metaEl);
+
+      const statusBadge = document.createElement('span');
+      statusBadge.className = 'badge ' + entry.status;
+      statusBadge.textContent = entry.status;
+
+      const btn = document.createElement('button');
+      btn.className = 'btn';
+      btn.textContent = idx === 0 ? 'Current' : 'Roll back to this';
+      btn.disabled = idx === 0;  // disable rollback to current
+      if (idx !== 0) {
+        btn.addEventListener('click', () => submitRollback(entry.id));
+      }
+
+      row.appendChild(info);
+      row.appendChild(statusBadge);
+      row.appendChild(btn);
+      rollbackHistory.appendChild(row);
+    });
+  }
+
+  async function submitRollback(deploymentId) {
+    if (!rollbackContext) return;
+    if (!confirm('Roll back to deployment #' + deploymentId + '? This will redeploy the older image.')) return;
+
+    rollbackError.textContent = '';
+
+    try {
+      const res = await fetch(API + '/deployments/' + rollbackContext.name + '/rollback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deployment_id: deploymentId,
+          environment: rollbackContext.environment,
+        }),
+      });
+      if (res.ok) {
+        rollbackModal.classList.remove('show');
+        await refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        rollbackError.textContent = data.error || 'Rollback failed.';
+      }
+    } catch (e) {
+      rollbackError.textContent = 'Network error: ' + e.message;
+    }
+  }
+
+  document.getElementById('cancel-rollback').addEventListener('click', () => {
+    rollbackModal.classList.remove('show');
+  });
+  rollbackModal.addEventListener('click', (e) => {
+    if (e.target === rollbackModal) rollbackModal.classList.remove('show');
+  });
+
+  refresh();
+  setInterval(refresh, 10000);  // Faster refresh so deployment status updates feel live
+</script>
+</body>
+</html>

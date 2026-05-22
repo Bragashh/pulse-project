@@ -1,0 +1,146 @@
+---
+# ── Base packages ────────────────────────────────────────────────────────────
+- name: Install base packages (Java, tools, Docker, pip)
+  apt:
+    name:
+      - openjdk-17-jre-headless    # Jenkins LTS needs Java 17
+      - curl
+      - gnupg
+      - ca-certificates
+      - docker.io
+      - python3-pip
+      - python3-venv
+      - unzip
+    state: present
+    update_cache: yes
+
+- name: Ensure Docker is running
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Install AWS CLI v2
+  shell: |
+    cd /tmp
+    curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+    unzip -o -q awscliv2.zip
+    ./aws/install --update
+  args:
+    creates: /usr/local/bin/aws
+
+# ── Jenkins repository + install ──────────────────────────────────────────────
+- name: Add Jenkins apt key
+  get_url:
+    url: "{{ jenkins_repo_key_url }}"
+    dest: /usr/share/keyrings/jenkins-keyring.asc
+
+- name: Add Jenkins apt repository
+  apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
+    state: present
+    filename: jenkins
+
+- name: Install Jenkins
+  apt:
+    name: jenkins
+    state: present
+    update_cache: yes
+
+# ── Skip the setup wizard ─────────────────────────────────────────────────────
+- name: Disable the Jenkins setup wizard
+  lineinfile:
+    path: /usr/lib/systemd/system/jenkins.service
+    regexp: '^Environment="JAVA_OPTS'
+    line: 'Environment="JAVA_OPTS=-Djenkins.install.runSetupWizard=false"'
+    insertafter: '^\[Service\]'
+
+- name: Add jenkins user to the docker group
+  user:
+    name: jenkins
+    groups: docker
+    append: yes
+
+- name: Reload systemd after unit change
+  systemd:
+    daemon_reload: yes
+
+- name: Enable and start Jenkins
+  service:
+    name: jenkins
+    state: restarted
+    enabled: yes
+
+- name: Wait for Jenkins to come up on port {{ jenkins_http_port }}
+  wait_for:
+    port: "{{ jenkins_http_port }}"
+    delay: 15
+    timeout: 180
+
+# ── Install required plugins (before the seed job needs them) ──────────────────
+# With the wizard skipped, no plugins are present. The jenkins_plugin module
+# downloads them via the update center and restarts Jenkins to load them.
+- name: Install Jenkins plugins
+  community.general.jenkins_plugin:
+    name: "{{ item }}"
+    url_username: ""
+    url_password: ""
+    url: "http://localhost:{{ jenkins_http_port }}"
+    state: present
+    timeout: 120
+  loop: "{{ jenkins_plugins }}"
+  register: plugin_result
+  until: plugin_result is succeeded
+  retries: 3
+  delay: 10
+  notify: restart jenkins
+
+# Flush so plugins are loaded before the Groovy scripts that depend on them run.
+- name: Apply plugin install (restart Jenkins now)
+  meta: flush_handlers
+
+- name: Wait for Jenkins again after plugin restart
+  wait_for:
+    port: "{{ jenkins_http_port }}"
+    delay: 10
+    timeout: 180
+
+# ── Seed admin user + pipeline job via Groovy init scripts ────────────────────
+- name: Create Jenkins init.groovy.d directory
+  file:
+    path: /var/lib/jenkins/init.groovy.d
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: '0755'
+
+- name: Install admin-user bootstrap script
+  template:
+    src: basic-security.groovy.j2
+    dest: /var/lib/jenkins/init.groovy.d/basic-security.groovy
+    owner: jenkins
+    group: jenkins
+    mode: '0644'
+  notify: restart jenkins
+
+- name: Install seed-job bootstrap script
+  template:
+    src: seed-job.groovy.j2
+    dest: /var/lib/jenkins/init.groovy.d/seed-job.groovy
+    owner: jenkins
+    group: jenkins
+    mode: '0644'
+  notify: restart jenkins
+
+- name: Apply Groovy init scripts (restart Jenkins)
+  meta: flush_handlers
+
+- name: Final wait for Jenkins
+  wait_for:
+    port: "{{ jenkins_http_port }}"
+    delay: 10
+    timeout: 180
+
+- name: Show where Jenkins is reachable
+  debug:
+    msg: "Jenkins is up. Log in at http://{{ ansible_host | default(inventory_hostname) }}:{{ jenkins_http_port }} with user '{{ jenkins_admin_user }}'."

@@ -1,0 +1,112 @@
+#!/bin/bash
+# One-time setup: install everything needed to run Pulse locally and to deploy
+# the AWS/Jenkins toolchain. Safe to re-run — each step is idempotent.
+#
+# Installs: Docker + compose, k3s, kubectl, Python venv tooling, Terraform,
+#           Ansible (+ required collections), AWS CLI.
+#
+# Tested on Ubuntu 22.04 / 24.04. Run with: ./setup.sh
+
+set -e
+
+echo "=================================================="
+echo " Pulse — local environment setup"
+echo "=================================================="
+
+# ── Docker + compose plugin ───────────────────────────────────────────────────
+if ! command -v docker >/dev/null 2>&1; then
+    echo "→ Installing Docker..."
+    sudo apt-get update -qq
+    sudo apt-get install -y docker.io docker-compose-v2
+    sudo systemctl enable --now docker
+    sudo usermod -aG docker "$USER" || true
+    echo "  Docker installed (you may need to log out/in for group changes)."
+else
+    echo "✓ Docker already present"
+fi
+
+# ── Python tooling ────────────────────────────────────────────────────────────
+echo "→ Ensuring Python venv + pip..."
+sudo apt-get install -y python3-pip python3-venv >/dev/null
+echo "✓ Python tooling ready"
+
+# Create the project virtualenv used by start.sh / tests
+if [ ! -d ".venv" ]; then
+    echo "→ Creating project virtualenv (.venv)..."
+    python3 -m venv .venv
+    . .venv/bin/activate
+    pip install --quiet -r portal/backend/requirements.txt
+    deactivate
+    echo "✓ .venv created with backend requirements"
+else
+    echo "✓ .venv already exists"
+fi
+
+# ── k3s (lightweight Kubernetes) ──────────────────────────────────────────────
+if ! command -v k3s >/dev/null 2>&1; then
+    echo "→ Installing k3s..."
+    curl -sfL https://get.k3s.io | sh -
+    echo "✓ k3s installed"
+else
+    echo "✓ k3s already present"
+fi
+
+# ── kubectl ───────────────────────────────────────────────────────────────────
+if ! command -v kubectl >/dev/null 2>&1; then
+    echo "→ Installing kubectl..."
+    KVER="$(curl -sL https://dl.k8s.io/release/stable.txt)"
+    curl -sLO "https://dl.k8s.io/release/${KVER}/bin/linux/amd64/kubectl"
+    sudo install -m 0755 kubectl /usr/local/bin/kubectl
+    rm -f kubectl
+    echo "✓ kubectl installed"
+else
+    echo "✓ kubectl already present"
+fi
+
+# ── Terraform ─────────────────────────────────────────────────────────────────
+if ! command -v terraform >/dev/null 2>&1; then
+    echo "→ Installing Terraform..."
+    sudo apt-get install -y gnupg software-properties-common curl
+    wget -O- https://apt.releases.hashicorp.com/gpg \
+        | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
+https://apt.releases.hashicorp.com $(lsb_release -cs) main" \
+        | sudo tee /etc/apt/sources.list.d/hashicorp.list >/dev/null
+    sudo apt-get update -qq
+    sudo apt-get install -y terraform
+    echo "✓ Terraform installed"
+else
+    echo "✓ Terraform already present"
+fi
+
+# ── Ansible + collections ─────────────────────────────────────────────────────
+if ! command -v ansible >/dev/null 2>&1; then
+    echo "→ Installing Ansible..."
+    sudo apt-get install -y ansible
+    echo "✓ Ansible installed"
+else
+    echo "✓ Ansible already present"
+fi
+
+echo "→ Installing required Ansible collections..."
+ansible-galaxy collection install -r ansible/requirements.yml >/dev/null
+echo "✓ Collections installed"
+
+# ── AWS CLI ───────────────────────────────────────────────────────────────────
+if ! command -v aws >/dev/null 2>&1; then
+    echo "→ Installing AWS CLI v2..."
+    curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+    (cd /tmp && unzip -oq awscliv2.zip && sudo ./aws/install --update)
+    echo "✓ AWS CLI installed"
+else
+    echo "✓ AWS CLI already present"
+fi
+
+echo ""
+echo "=================================================="
+echo " Setup complete."
+echo ""
+echo " Next steps:"
+echo "   Local app:   ./start.sh"
+echo "   AWS/Jenkins: see README (Terraform + Ansible sections)"
+echo "=================================================="

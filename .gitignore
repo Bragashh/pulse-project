@@ -1,0 +1,29 @@
+# Ansible secrets
+ansible/.vault_pass
+ansible/inventory/jenkins.ini
+
+# NOTE: ansible/group_vars/all/vault.yml IS committed — it is encrypted with
+# ansible-vault and safe to store. The .vault_pass key file is what stays out.
+
+# Terraform
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfvars
+terraform/.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+.terraform/
+
+# Keys / env
+*.pem
+*.key
+.env
+.env.*
+
+# Python
+.venv
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/

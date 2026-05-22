@@ -1,0 +1,27 @@
+---
+# Jenkins admin user. The PASSWORD comes from the vault (see group_vars/all/vault.yml).
+jenkins_admin_user: "admin"
+
+# Jenkins version channel — "stable" pulls the LTS line.
+jenkins_repo_key_url: "https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key"
+jenkins_repo_url: "deb https://pkg.jenkins.io/debian-stable binary/"
+
+# Port Jenkins listens on (matches the security group rule in Terraform).
+jenkins_http_port: 8080
+
+# ECR registry the pipeline pushes to. Override per-user; account ID is NOT hardcoded.
+# Format: <account_id>.dkr.ecr.<region>.amazonaws.com
+ecr_registry: "CHANGE_ME.dkr.ecr.eu-central-1.amazonaws.com"
+aws_region: "eu-central-1"
+
+# Git repo the seed pipeline job pulls its Jenkinsfile from.
+# Point this at your own fork/clone of pulse-project.
+pipeline_repo_url: "https://github.com/Bragashh/pulse-project.git"
+pipeline_repo_branch: "main"
+
+# Plugins required for the seed pipeline job (Git SCM + pipeline support).
+jenkins_plugins:
+  - git
+  - workflow-aggregator
+  - configuration-as-code
+jenkins_cli_jar: /tmp/jenkins-cli.jar
