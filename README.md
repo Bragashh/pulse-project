@@ -6,8 +6,6 @@ and roll back services from a dashboard, backed by live observability
 AWS toolchain — provisioned with Terraform, configured with Ansible — that
 stands up a Jenkins CI/CD pipeline.
 
-This README is a step-by-step operator guide. Run the commands in order.
-
 ---
 
 ## Architecture
@@ -23,7 +21,7 @@ the other to run.
 
 ## Quick Start (local app)
 
-Tested on Ubuntu 22.04 / 24.04 with at least 4 GB RAM. Every command included —
+Tested on Ubuntu 24.04 with at least 4 GB RAM. Every command included —
 assumes a fresh machine.
 
 ```bash
@@ -74,7 +72,7 @@ toolchain.
 
 ### Step 1 — AWS credentials
 
-Provide your own AWS credentials in the current shell (never committed):
+Provide AWS credentials in the current shell (never committed):
 
 ```bash
 export AWS_ACCESS_KEY_ID=your-key-id
@@ -89,7 +87,7 @@ cp terraform.tfvars.example terraform.tfvars
 #   open terraform.tfvars and set region / key_name / public_key_path if needed
 
 terraform init
-terraform apply           # type 'yes' to confirm
+terraform apply           
 ```
 
 When it finishes, note the outputs:
@@ -111,7 +109,7 @@ chmod 600 .vault_pass
 # Install the required Ansible collections
 ansible-galaxy collection install -r requirements.yml
 
-# Point the inventory at the EC2 you just created
+# Point the inventory at the EC2 created
 cp inventory/jenkins.ini.example inventory/jenkins.ini
 JENKINS_IP=$(terraform -chdir=../terraform output -raw jenkins_ip)
 sed -i "s/JENKINS_EC2_IP/${JENKINS_IP}/" inventory/jenkins.ini
@@ -133,13 +131,13 @@ Open the `jenkins_url` from Step 2 (`http://<ip>:8080`) and log in:
 
 Run the `pulse-pipeline` job. It checks out the repo, runs the 66 backend tests,
 builds the three images, and — if you set a real `ECR_REGISTRY` (see below) —
-pushes them to ECR. A green build means the whole chain works.
+pushes them to ECR. 
 
 ### Step 5 — Tear down (when finished)
 
 ```bash
 cd ../terraform
-terraform destroy         # type 'yes' — nothing is retained, no Elastic IP
+terraform destroy         
 ```
 
 ---
@@ -226,18 +224,6 @@ The observability stack provides:
 | Configuration management | Ansible (+ Ansible Vault) |
 | CI/CD | Jenkins (pipeline on AWS) + GitHub Actions (tests on every push) |
 | Tests | pytest — 66 tests covering routes, DB, deploy/promote/rollback |
-
----
-
-## Course requirements mapping
-
-| # | Requirement | Where it's met |
-| --- | --- | --- |
-| 1 | Create machines with Terraform | `terraform/` — provisions the Jenkins EC2 (parameterised, no EIP) |
-| 2 | Configure machines with Ansible | `ansible/` — installs + configures Jenkins via the `jenkins` role + Vault |
-| 3 | CI/CD (Jenkins preferred) | Jenkins pipeline (`Jenkinsfile`) on AWS; GitHub Actions also runs tests on push |
-| 4 | Containerised app (docker-compose or k8s) | App runs on k3s; monitoring via docker-compose; all services have Dockerfiles |
-| 5 | README explaining how to run / tech / what it does | This file |
 
 ---
 
