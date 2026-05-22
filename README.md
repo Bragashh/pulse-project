@@ -10,6 +10,17 @@ This README is a step-by-step operator guide. Run the commands in order.
 
 ---
 
+## Architecture
+
+![Pulse architecture](docs/architecture.svg)
+
+The application (left) runs locally on k3s with a docker-compose observability
+stack. The AWS toolchain (right) is provisioned with Terraform and configured
+with Ansible to run a Jenkins pipeline. The two are independent — neither needs
+the other to run.
+
+---
+
 ## Quick Start (local app)
 
 Tested on Ubuntu 22.04 / 24.04 with at least 4 GB RAM. Every command included —
