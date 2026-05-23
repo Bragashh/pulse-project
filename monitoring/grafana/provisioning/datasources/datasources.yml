@@ -1,7 +1,7 @@
 apiVersion: 1
 
 # Provisioned data sources — created automatically on Grafana startup so the
-# dashboards below can reference them by fixed UID (no manual setup needed).
+# dashboards below can reference them by fixed UID.
 datasources:
   - name: Prometheus
     type: prometheus

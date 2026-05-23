@@ -1,15 +1,3 @@
-#!/bin/bash
-# provision-aws.sh — stand up the AWS side in one go.
-#
-# STEP 1: prompt for AWS credentials (kept in this shell session only, never
-#         written to disk)
-# STEP 2: Terraform creates the EC2
-# STEP 3: inject the EC2 IP into the Ansible inventory automatically
-# STEP 4: Ansible installs + configures Jenkins on it
-#
-# Alternative: if you already ran `aws configure`, just press Enter at the
-# prompts and your configured credentials will be used.
-
 set -euo pipefail
 
 echo "=================================================="

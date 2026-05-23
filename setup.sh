@@ -1,12 +1,3 @@
-#!/bin/bash
-# One-time setup: install everything needed to run Pulse locally and to deploy
-# the AWS/Jenkins toolchain. Safe to re-run — each step is idempotent.
-#
-# Installs: Docker + compose, minikube, kubectl, Python venv tooling, Terraform,
-#           Ansible (+ required collections), AWS CLI.
-#
-# Tested on Ubuntu 22.04 / 24.04. Run with: ./setup.sh
-
 set -e
 
 echo "=================================================="

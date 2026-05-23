@@ -1,9 +1,3 @@
-
-// Pulse CI/CD pipeline (Option 1: artifact-based delivery, no registry).
-// Builds the images, runs the 66 backend tests, and — on success — saves the
-// backend image as a tarball and archives it. The local deploy-local.sh script
-// downloads that artifact and deploys it to local minikube, so minikube runs the exact
-// image this pipeline built and tested.
 pipeline {
     agent any
  

@@ -1,86 +1,143 @@
-<svg viewBox="0 0 1060 720" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', system-ui, sans-serif">
+<svg viewBox="0 0 1280 760" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', system-ui, sans-serif">
   <defs>
     <style>
-      .bg     { fill: #0d1117; }
-      .lane   { fill: #11161d; stroke: #30363d; stroke-width: 1; }
-      .laneaws{ fill: #15130c; stroke: #9e6a03; stroke-width: 1.5; }
-      .box    { fill: #161b22; stroke: #30363d; stroke-width: 1.5; }
-      .boxk   { fill: #0f1a14; stroke: #2ea043; stroke-width: 1.5; }
-      .boxobs { fill: #1a1410; stroke: #d29922; stroke-width: 1.5; }
-      .boxaws { fill: #1c1407; stroke: #d29922; stroke-width: 1.5; }
-      .title  { fill: #e6edf3; font-weight: 700; }
-      .label  { fill: #e6edf3; font-size: 13px; font-weight: 600; }
-      .sub    { fill: #8b949e; font-size: 11px; }
-      .lane-l { fill: #6e7681; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; }
-      .flowb  { stroke: #58a6ff; stroke-width: 2.5; fill: none; }
-      .flowg  { stroke: #3fb950; stroke-width: 2; fill: none; }
-      .flowo  { stroke: #d29922; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
-      .arrowb { fill: #58a6ff; } .arrowg { fill: #3fb950; } .arrowo { fill: #d29922; }
-      .bridge { fill: #1f6feb; font-size: 11px; font-weight: 700; }
+      .bg      { fill: #0d1117; }
+      .ink     { fill: #e6edf3; }
+      .muted   { fill: #8b949e; }
+      .faint   { fill: #6e7681; }
+      .card    { fill: #161b22; stroke: #2d333b; stroke-width: 1.2; }
+      .cardhi  { fill: #18212f; stroke: #2f81f7; stroke-width: 2; }
+      .region  { fill: none; stroke-width: 1.4; }
+      .spine   { stroke: #2f81f7; stroke-width: 3.5; fill: none; }
+      .wire    { stroke: #545d68; stroke-width: 1.6; fill: none; }
+      .wired   { stroke: #545d68; stroke-width: 1.6; fill: none; stroke-dasharray: 5 4; }
     </style>
-    <marker id="ab" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" class="arrowb"/></marker>
-    <marker id="ag" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" class="arrowg"/></marker>
-    <marker id="ao" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" class="arrowo"/></marker>
+    <marker id="sp" markerWidth="12" markerHeight="12" refX="7" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 Z" fill="#2f81f7"/></marker>
+    <marker id="wi" markerWidth="10" markerHeight="10" refX="6" refY="3.5" orient="auto"><path d="M0,0 L8,3.5 L0,7 Z" fill="#545d68"/></marker>
+    <linearGradient id="cloudfade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d29922" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#d29922" stop-opacity="0.01"/>
+    </linearGradient>
+    <linearGradient id="localfade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2ea043" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#2ea043" stop-opacity="0.01"/>
+    </linearGradient>
   </defs>
 
-  <rect class="bg" x="0" y="0" width="1060" height="720"/>
-  <text x="40" y="42" class="title" font-size="22">Pulse — Connected CI/CD Flow</text>
-  <text x="40" y="64" class="sub" font-size="12">Jenkins builds + tests on AWS → archives the image → the local deploy script pulls that exact image and runs it on minikube</text>
+  <rect class="bg" x="0" y="0" width="1280" height="760"/>
+  <text x="48" y="50" class="ink" font-size="24" font-weight="700">Pulse — Architecture</text>
+  <text x="48" y="74" class="muted" font-size="13">A tested container image is built in the cloud and delivered to a local cluster. Follow the bold blue path.</text>
 
-  <!-- ===== AWS side ===== -->
-  <text x="40" y="104" class="lane-l">AWS — provisioned by Terraform, configured by Ansible</text>
-  <rect class="laneaws" x="40" y="116" width="470" height="300" rx="10"/>
+  <!-- ===================== CLOUD REGION ===================== -->
+  <rect x="48" y="100" width="700" height="300" rx="16" fill="url(#cloudfade)" stroke="#9e6a03" stroke-width="1.4"/>
+  <text x="72" y="128" fill="#d29922" font-size="12" font-weight="700" letter-spacing="0.12em">☁  AWS — EPHEMERAL (terraform up · terraform destroy)</text>
 
-  <rect class="box" x="64" y="140" width="200" height="60" rx="8"/>
-  <text x="84" y="165" class="label">Terraform</text>
-  <text x="84" y="183" class="sub">creates the EC2 (no EIP)</text>
+  <!-- Terraform -->
+  <rect class="card" x="72" y="150" width="150" height="86" rx="9"/>
+  <text x="88" y="178" class="ink" font-size="14" font-weight="700">Terraform</text>
+  <text x="88" y="199" class="muted" font-size="10.5">declares + creates</text>
+  <text x="88" y="214" class="muted" font-size="10.5">the EC2, key pair,</text>
+  <text x="88" y="229" class="muted" font-size="10.5">security group</text>
 
-  <rect class="box" x="288" y="140" width="200" height="60" rx="8"/>
-  <text x="308" y="165" class="label">Ansible</text>
-  <text x="308" y="183" class="sub">installs + configures Jenkins</text>
+  <!-- EC2 -->
+  <rect class="card" x="246" y="150" width="150" height="86" rx="9"/>
+  <text x="262" y="178" class="ink" font-size="14" font-weight="700">AWS EC2</text>
+  <text x="262" y="199" class="muted" font-size="10.5">the cloud host</text>
+  <text x="262" y="214" class="muted" font-size="10.5">Ubuntu VM that</text>
+  <text x="262" y="229" class="muted" font-size="10.5">runs Jenkins</text>
 
-  <rect class="boxaws" x="64" y="230" width="424" height="160" rx="8"/>
-  <text x="84" y="255" class="label">Jenkins pipeline (port 8080)</text>
-  <text x="84" y="284" class="sub">1 · checkout the repo</text>
-  <text x="84" y="306" class="sub">2 · build the Docker images</text>
-  <text x="84" y="328" class="sub">3 · run the 66 backend tests</text>
-  <text x="84" y="350" class="sub">4 · on success: docker save → archive image.tar</text>
-  <text x="84" y="372" class="sub">    (red build = nothing archived)</text>
+  <!-- Ansible -->
+  <rect class="card" x="420" y="150" width="150" height="86" rx="9"/>
+  <text x="436" y="178" class="ink" font-size="14" font-weight="700">Ansible</text>
+  <text x="436" y="199" class="muted" font-size="10.5">configures the host:</text>
+  <text x="436" y="214" class="muted" font-size="10.5">Java, Docker,</text>
+  <text x="436" y="229" class="muted" font-size="10.5">Jenkins, plugins</text>
 
-  <path class="flowo" d="M264,170 L286,170" marker-end="url(#ao)"/>
-  <path class="flowo" d="M276,200 C276,214 200,218 180,228" marker-end="url(#ao)"/>
+  <!-- Jenkins (centerpiece, bigger, highlighted) -->
+  <rect class="cardhi" x="156" y="262" width="500" height="116" rx="11"/>
+  <text x="178" y="290" class="ink" font-size="16" font-weight="700">Jenkins  ·  CI/CD pipeline</text>
+  <text x="178" y="314" class="muted" font-size="11.5">checkout from GitHub  →  run 66 tests  →  build images  →  save image as .tar</text>
+  <text x="178" y="334" class="muted" font-size="11.5">A red build archives nothing — broken code can never be deployed.</text>
+  <text x="178" y="360" fill="#2f81f7" font-size="11.5" font-weight="700">Output ▸ a tested, packaged container image</text>
 
-  <!-- ===== Bridge ===== -->
-  <text x="540" y="270" class="bridge">deploy-local.sh</text>
-  <text x="540" y="286" class="sub">checks build = SUCCESS</text>
-  <text x="540" y="300" class="sub">downloads image.tar</text>
-  <text x="540" y="314" class="sub">over the Jenkins API</text>
-  <path class="flowb" d="M490,300 L700,300" marker-end="url(#ab)"/>
-  <text x="556" y="338" class="sub">no green build → refuses to deploy</text>
+  <!-- GitHub feeding in from the side -->
+  <rect class="card" x="788" y="150" width="160" height="86" rx="9"/>
+  <text x="808" y="178" class="ink" font-size="14" font-weight="700">GitHub</text>
+  <text x="808" y="199" class="muted" font-size="10.5">source of truth</text>
+  <text x="808" y="214" class="muted" font-size="10.5">code + Jenkinsfile;</text>
+  <text x="808" y="229" class="muted" font-size="10.5">Actions runs tests</text>
 
-  <!-- ===== Local side ===== -->
-  <text x="710" y="104" class="lane-l">LOCAL — your machine / VM</text>
-  <rect class="lane" x="710" y="116" width="310" height="470" rx="10"/>
+  <!-- ===================== LOCAL REGION ===================== -->
+  <rect x="48" y="440" width="1184" height="290" rx="16" fill="url(#localfade)" stroke="#2ea043" stroke-width="1.4"/>
+  <text x="72" y="468" fill="#3fb950" font-size="12" font-weight="700" letter-spacing="0.12em">🖥  LOCAL MACHINE — PERSISTENT</text>
 
-  <rect class="box" x="734" y="230" width="262" height="70" rx="8"/>
-  <text x="754" y="256" class="label">minikube image load</text>
-  <text x="754" y="276" class="sub">image loaded into minikube</text>
-  <text x="754" y="290" class="sub">(imagePullPolicy: Never)</text>
+  <!-- minikube cluster boundary (dashed, k8s-style) -->
+  <rect x="72" y="486" width="560" height="224" rx="12" fill="#0f1a14" stroke="#2ea043" stroke-width="1.4" stroke-dasharray="7 5"/>
+  <text x="92" y="508" fill="#3fb950" font-size="11" font-weight="700">minikube cluster</text>
 
-  <rect class="boxk" x="734" y="320" width="262" height="90" rx="8"/>
-  <text x="754" y="346" class="label">minikube — url-shortener</text>
-  <text x="754" y="368" class="sub">runs the exact image Jenkins</text>
-  <text x="754" y="384" class="sub">built and tested · + Redis</text>
+  <!-- url-shortener pod -->
+  <rect class="card" x="92" y="524" width="230" height="80" rx="9"/>
+  <text x="110" y="551" class="ink" font-size="13.5" font-weight="700">url-shortener</text>
+  <text x="110" y="572" class="muted" font-size="10.5">the deployed app —</text>
+  <text x="110" y="587" class="muted" font-size="10.5">runs the exact image Jenkins built</text>
 
-  <rect class="box" x="734" y="430" width="262" height="60" rx="8"/>
-  <text x="754" y="455" class="label">Pulse app + monitoring</text>
-  <text x="754" y="473" class="sub">backend (process) · Grafana/Prometheus/Loki</text>
+  <!-- Redis as a cylinder -->
+  <g>
+    <ellipse cx="467" cy="534" rx="75" ry="13" fill="#161b22" stroke="#2d333b" stroke-width="1.2"/>
+    <path d="M392,534 L392,592 A75,13 0 0 0 542,592 L542,534" fill="#161b22" stroke="#2d333b" stroke-width="1.2"/>
+    <ellipse cx="467" cy="534" rx="75" ry="13" fill="#1c2330" stroke="#2d333b" stroke-width="1.2"/>
+    <text x="467" y="566" text-anchor="middle" class="ink" font-size="13.5" font-weight="700">Redis</text>
+    <text x="467" y="584" text-anchor="middle" class="muted" font-size="10">key/value store</text>
+  </g>
 
-  <path class="flowb" d="M820,300 L820,318" marker-end="url(#ab)"/>
-  <path class="flowg" d="M820,410 L820,428" marker-end="url(#ag)"/>
+  <!-- pod -> redis wire inside cluster -->
+  <path class="wire" d="M322,564 L388,564" marker-end="url(#wi)"/>
 
-  <!-- bottom note -->
-  <rect class="box" x="40" y="610" width="980" height="64" rx="8"/>
-  <text x="60" y="636" class="label">The dependency is real</text>
-  <text x="60" y="656" class="sub">minikube only runs an image that Jenkins built and tested. If the pipeline is red, there is no artifact, and deploy-local.sh refuses. GitHub Actions also runs the 66 tests on every push.</text>
+  <!-- Pulse dashboard (endpoint, prominent) -->
+  <rect class="card" x="668" y="500" width="220" height="120" rx="11"/>
+  <text x="688" y="528" class="ink" font-size="15" font-weight="700">Pulse dashboard</text>
+  <text x="688" y="550" class="muted" font-size="10.5">Flask backend + web UI.</text>
+  <text x="688" y="566" class="muted" font-size="10.5">deploy · promote · rollback,</text>
+  <text x="688" y="582" class="muted" font-size="10.5">URL-shortener panel,</text>
+  <text x="688" y="598" class="muted" font-size="10.5">monitoring at a glance</text>
+
+  <!-- Observability cluster -->
+  <rect x="924" y="486" width="288" height="224" rx="12" fill="#0c1119" stroke="#2f81f7" stroke-width="1.2"/>
+  <text x="944" y="510" fill="#58a6ff" font-size="11.5" font-weight="700">observability (docker-compose)</text>
+
+  <rect class="card" x="944" y="524" width="118" height="74" rx="8"/>
+  <text x="960" y="549" class="ink" font-size="12" font-weight="700">Prometheus</text>
+  <text x="960" y="568" class="muted" font-size="9.5">scrapes</text>
+  <text x="960" y="581" class="muted" font-size="9.5">metrics</text>
+
+  <rect class="card" x="1074" y="524" width="118" height="74" rx="8"/>
+  <text x="1090" y="549" class="ink" font-size="12" font-weight="700">Loki</text>
+  <text x="1090" y="568" class="muted" font-size="9.5">collects</text>
+  <text x="1090" y="581" class="muted" font-size="9.5">logs</text>
+
+  <rect class="card" x="944" y="610" width="248" height="84" rx="8"/>
+  <text x="960" y="635" class="ink" font-size="12.5" font-weight="700">Grafana</text>
+  <text x="960" y="655" class="muted" font-size="9.5">dashboards over metrics + logs,</text>
+  <text x="960" y="670" class="muted" font-size="9.5">opened from the Pulse dashboard</text>
+
+  <!-- ===================== FLOW ===================== -->
+  <!-- spine through infra -->
+  <path class="spine" d="M222,193 L244,193" marker-end="url(#sp)"/>
+  <path class="spine" d="M396,193 L418,193" marker-end="url(#sp)"/>
+  <!-- ansible -> jenkins -->
+  <path class="spine" d="M495,236 C495,250 460,252 430,261" marker-end="url(#sp)"/>
+  <!-- github -> jenkins (wire, supporting) -->
+  <path class="wired" d="M788,210 C700,250 660,270 658,300" marker-end="url(#wi)"/>
+
+  <!-- THE money arrow: Jenkins image -> minikube, across the boundary -->
+  <path class="spine" d="M250,378 C250,420 210,440 200,522" marker-end="url(#sp)"/>
+  <text x="262" y="424" fill="#2f81f7" font-size="11.5" font-weight="700">tested image delivered to the cluster</text>
+
+  <!-- app -> dashboard -->
+  <path class="wire" d="M632,560 L666,558" marker-end="url(#wi)"/>
+  <!-- dashboard -> observability -->
+  <path class="wire" d="M888,556 L922,556" marker-end="url(#wi)"/>
+  <!-- prometheus/loki -> grafana -->
+  <path class="wired" d="M1003,598 L1010,608" marker-end="url(#wi)"/>
+  <path class="wired" d="M1133,598 L1120,608" marker-end="url(#wi)"/>
 </svg>

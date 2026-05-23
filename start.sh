@@ -1,7 +1,3 @@
-#!/bin/bash
-# Bring up the full Pulse stack for local development.
-# Starts: minikube (if not running), Flask backend, monitoring (Prometheus/Grafana/Loki/Promtail).
-
 set -e
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

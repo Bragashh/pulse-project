@@ -3,7 +3,7 @@
 - name: Install base packages (Java, tools, Docker, pip)
   apt:
     name:
-      - openjdk-21-jre-headless    # Jenkins LTS now requires Java 21
+      - openjdk-21-jre-headless    
       - curl
       - gnupg
       - ca-certificates
@@ -32,8 +32,6 @@
  
 # ── Jenkins repository + install ──────────────────────────────────────────────
 - name: Discover the latest Jenkins LTS .deb filename
-  # The apt repo's GPG keys are unreliable (rotated/expired), so we install the
-  # .deb directly from the Jenkins mirror — no GPG repo needed.
   shell: |
     curl -fsSL https://get.jenkins.io/debian-stable/ \
       | grep -oP 'jenkins_[0-9.]+_all\.deb' | sort -V | tail -1
@@ -51,8 +49,6 @@
     deb: /tmp/jenkins.deb
     state: present
  
-# The .deb auto-starts Jenkins, which begins the setup wizard. Stop it and clear
-# the first-run state so the wizard-skip + seeded admin take effect on next start.
 - name: Stop Jenkins before reconfiguring
   service:
     name: jenkins
@@ -90,9 +86,6 @@
     append: yes
  
 # ── Place plugins + Groovy scripts BEFORE starting Jenkins ────────────────────
-# Installing plugins over the HTTP API fights CSRF on a wizard-skipped Jenkins.
-# Instead we use jenkins-plugin-cli (ships with the Jenkins package), which
-# resolves all dependencies and writes the .jpi files directly — no API, no CSRF.
 - name: Create the Jenkins plugins directory
   file:
     path: /var/lib/jenkins/plugins

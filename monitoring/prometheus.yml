@@ -2,8 +2,8 @@
 # Scrapes the backend's /prometheus-metrics endpoint every 15 seconds.
 
 global:
-  scrape_interval: 15s          # how often Prometheus checks each target
-  evaluation_interval: 15s      # how often Prometheus evaluates alert rules
+  scrape_interval: 15s          
+  evaluation_interval: 15s      
 
 scrape_configs:
   - job_name: 'pulse-backend'

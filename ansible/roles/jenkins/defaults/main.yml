@@ -1,25 +1,21 @@
 ---
 jenkins_admin_user: "admin"
  
-# Jenkins version channel — "stable" pulls the LTS line.
- 
 # Port Jenkins listens on (matches the security group rule in Terraform).
 jenkins_http_port: 8080
  
-# ECR registry the pipeline pushes to. Override per-user; account ID is NOT hardcoded.
-# Format: <account_id>.dkr.ecr.<region>.amazonaws.com
+# ECR registry the pipeline pushes to. 
 ecr_registry: "CHANGE_ME.dkr.ecr.eu-central-1.amazonaws.com"
 aws_region: "eu-central-1"
  
 # Git repo the seed pipeline job pulls its Jenkinsfile from.
-# Point this at your own fork/clone of pulse-project.
 pipeline_repo_url: "https://github.com/Bragashh/pulse-project.git"
 pipeline_repo_branch: "main"
  
 # Plugins required for the seed pipeline job (Git SCM + pipeline support).
 # jenkins-plugin-cli resolves all transitive dependencies, so we can list the
 # high-level plugins. git + pipeline for the job, stage-view + blueocean for the
-# visual pipeline display, configuration-as-code for completeness.
+# visual pipeline display.
 jenkins_plugins:
   - git
   - workflow-aggregator

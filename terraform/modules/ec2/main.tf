@@ -1,6 +1,4 @@
 # EC2 module — one Ubuntu instance using its default public IP.
-# No Elastic IP: the instance gets a public IP automatically in a default VPC,
-# and `terraform destroy` tears everything down cleanly (nothing is retained).
 
 resource "aws_instance" "this" {
   ami                    = var.ami

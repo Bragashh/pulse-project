@@ -18,7 +18,6 @@ def db_module(tmp_path, monkeypatch):
     test_db_path = tmp_path / "test_pulse.db"
     monkeypatch.setenv("PULSE_DB_PATH", str(test_db_path))
 
-    # Force a fresh import so DB_PATH is re-read from the env var
     import importlib
     import db
     importlib.reload(db)
@@ -126,7 +125,6 @@ def test_can_add_service_after_soft_deleting_same_name(db_module):
     sid1 = db_module.add_monitored_service("Google", "https://www.google.com")
     db_module.soft_delete_monitored_service(sid1)
 
-    # Should not raise an integrity error
     sid2 = db_module.add_monitored_service("Google", "https://www.google.com.au")
     assert sid2 != sid1
 

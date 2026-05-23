@@ -1,6 +1,3 @@
-#!/bin/bash
-# Stop the local Pulse stack.
-
 set -e
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

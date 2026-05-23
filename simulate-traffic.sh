@@ -1,10 +1,3 @@
-#!/bin/bash
-# Continuously hit Pulse endpoints to generate metrics and logs.
-# Run alongside the stack to see live data in Grafana.
-#
-# Usage: ./simulate-traffic.sh
-# Stop:  Ctrl+C
-
 BASE_URL="${BASE_URL:-http://localhost:5000}"
 
 # Verify backend is up before starting

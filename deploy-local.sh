@@ -1,23 +1,3 @@
-#!/bin/bash
-# deploy-local.sh — the bridge between Jenkins (on AWS) and local minikube.
-#
-# Checks that the latest Jenkins pipeline build SUCCEEDED, downloads the
-# url-shortener image artifact it produced, loads it into minikube, and deploys it.
-# If Jenkins has not produced a passing build, this script refuses to deploy —
-# so minikube only ever runs an image that Jenkins built and tested.
-#
-# The url-shortener is the service that runs on Kubernetes (minikube); the Pulse backend
-# runs as a process and monitoring via docker-compose (see start.sh). This
-# script therefore deploys the url-shortener from the Jenkins-built artifact.
-#
-# Usage:
-#   JENKINS_URL=http://<ec2-ip>:8080 ./deploy-local.sh
-#
-# Optional env vars (defaults shown):
-#   JENKINS_USER  admin
-#   JENKINS_TOKEN admin            (the admin password, or an API token)
-#   JOB_NAME      pulse-pipeline
-
 set -euo pipefail
 
 JENKINS_URL="${JENKINS_URL:-}"
@@ -59,8 +39,6 @@ echo "→ Downloading ${IMAGE}.tar from Jenkins..."
 curl -fsSL $AUTH "${ARTIFACT_BASE}/${IMAGE}.tar" -o "${WORKDIR}/${IMAGE}.tar"
 
 # ── Load the image into minikube ──────────────────────────────────────────────
-# minikube runs its own container runtime; the image must be loaded into it so
-# pods can use it with imagePullPolicy: Never.
 echo "→ Loading ${IMAGE} into minikube..."
 minikube image load "${WORKDIR}/${IMAGE}.tar"
 

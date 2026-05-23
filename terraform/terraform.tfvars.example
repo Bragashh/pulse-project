@@ -1,22 +1,9 @@
-# Copy this file to terraform.tfvars and adjust for your own AWS setup.
-#   cp terraform.tfvars.example terraform.tfvars
-#
-# AWS credentials are NOT set here. Provide them via the standard AWS
-# mechanisms before running terraform:
-#   export AWS_ACCESS_KEY_ID=...
-#   export AWS_SECRET_ACCESS_KEY=...
-# or configure a profile with `aws configure`.
-
 region          = "eu-central-1"
 instance_type   = "t3.small"
 
-# If you deploy outside eu-central-1, set an Ubuntu 24.04 AMI for your region.
 ami             = "ami-0a628e1e89aaedf80"
 
-# SSH key pair: point this at your own public key.
 key_name        = "pulse-project-key"
 public_key_path = "~/.ssh/id_rsa.pub"
 
-# Lock SSH to your own IP for safety, e.g. "203.0.113.4/32".
-# Leave as the open default only for short-lived demo use.
 ssh_cidr        = "0.0.0.0/0"

@@ -20,7 +20,6 @@ module "networking" {
 }
 
 # Single EC2 that hosts Jenkins. The application itself runs locally on minikube;
-# this machine exists to demonstrate the Terraform -> Ansible -> Jenkins toolchain.
 module "jenkins" {
   source            = "./modules/ec2"
   name              = "pulse-project-jenkins"

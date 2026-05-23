@@ -11,11 +11,9 @@ def client(tmp_path, monkeypatch):
     test_db_path = tmp_path / "test_pulse.db"
     monkeypatch.setenv("PULSE_DB_PATH", str(test_db_path))
 
-    # Reload db module so it picks up the new env var path
     import db
     importlib.reload(db)
 
-    # Reload app so it uses the reloaded db module
     import app
     importlib.reload(app)
 
@@ -362,7 +360,6 @@ def test_deploy_endpoint_returns_202(client, mocker):
         "namespace": "pulse-deployed",
         "node_port": 31000,
     })
-    # Don't actually start the polling thread
     mocker.patch("app.threading.Thread")
 
     response = client.post("/services/deploy", json={
@@ -580,8 +577,7 @@ def test_history_returns_deployments(client, mocker):
     client.post("/services/deploy", json={
         "name": "histtest", "image": "histtest:v1", "port": 80, "environment": "staging",
     })
-    # Note: we'd normally rollback or redeploy here, but for the test the service constraints
-    # mean the second deploy attempt would 409. So we directly insert a second deployment row.
+
     import db as db_module
     svc = db_module.get_deployed_service_by_name("histtest", "staging")
     db_module.add_deployment(svc["id"], "histtest:v2", "staging", status="healthy")
@@ -646,7 +642,6 @@ def test_rollback_uses_correct_image(client, mocker):
 
     client.post("/deployments/imgtest/rollback", json={"deployment_id": target_id})
 
-    # The second deploy call (the rollback) should use the old image
     assert len(deploy_calls) == 2
     assert deploy_calls[1]["image"] == "imgtest:old"
 

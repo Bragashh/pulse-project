@@ -1,9 +1,0 @@
-# Copy to jenkins.ini and replace the IP with your Terraform output:
-#   terraform -chdir=../terraform output -raw jenkins_ip
-#
-# Example:
-#   [jenkins]
-#   52.59.123.45 ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa
-
-[jenkins]
-JENKINS_EC2_IP ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa
