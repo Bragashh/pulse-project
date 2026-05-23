@@ -2,7 +2,7 @@
 
 Pulse is a containerised web application that lets a developer deploy, promote,
 and roll back services from a dashboard, backed by live observability
-(Prometheus, Grafana, Loki). It runs locally on Kubernetes (k3s), and ships an
+(Prometheus, Grafana, Loki). It runs locally on Kubernetes (minikube), and ships an
 AWS toolchain — provisioned with Terraform, configured with Ansible — that
 stands up a Jenkins CI/CD pipeline.
 
@@ -14,61 +14,16 @@ This README is a step-by-step operator guide. Run the commands in order.
 
 ![Pulse architecture](docs/architecture.svg)
 
-The Jenkins pipeline on AWS builds and tests the image, then archives it. The local `deploy-local.sh` checks the build passed, pulls that exact image, and deploys it to k3s — so the cloud CI and the local cluster genuinely depend on each other.
+The Jenkins pipeline on AWS builds and tests the image, then archives it. The local `deploy-local.sh` checks the build passed, pulls that exact image, and deploys it to minikube — so the cloud CI and the local cluster genuinely depend on each other.
 
 ---
 
-## Quick Start (local app)
-
-Tested on Ubuntu 22.04 / 24.04 with at least 4 GB RAM. Every command included —
-assumes a fresh machine.
-
-```bash
-# 1. Clone
-git clone https://github.com/Bragashh/pulse-project.git
-cd pulse-project
-
-# 2. Make the scripts executable (zip/clone can drop the +x bit)
-chmod +x setup.sh start.sh stop.sh simulate-traffic.sh
-
-# 3. Install all prerequisites (Docker, k3s, kubectl, Terraform,
-#    Ansible, AWS CLI, and the project virtualenv). Safe to re-run.
-./setup.sh
-
-# 4. Log out and back in once (so your user picks up the docker group),
-#    OR run this to apply it in the current shell:
-newgrp docker
-
-# 5. Bring the stack up
-./start.sh
-```
-
-When `start.sh` finishes it prints the URLs. Open:
-
-- **Dashboard:** `http://localhost:5000/dashboard`
-- **Grafana:** `http://localhost:3000` (admin / admin)
-- **Prometheus:** `http://localhost:9090`
-
-Generate some traffic so the Grafana panels show activity:
-
-```bash
-./simulate-traffic.sh        # Ctrl+C to stop
-```
-
-Stop everything:
-
-```bash
-./stop.sh
-```
-
----
-
-## Quick Start (AWS CI/CD: Terraform → Ansible → Jenkins → k3s)
+## Quick Start (AWS CI/CD: Terraform → Ansible → Jenkins → minikube)
 
 This is the connected pipeline. Terraform creates an EC2, Ansible installs
 Jenkins on it, the Jenkins pipeline builds and tests the images and archives
-them, and a local script pulls the tested image and deploys it to your k3s.
-**k3s only ever runs an image that Jenkins built and tested.**
+them, and a local script pulls the tested image and deploys it to your minikube.
+**minikube only ever runs an image that Jenkins built and tested.**
 
 ### Step 1 — Provision + configure (one script)
 
@@ -92,7 +47,7 @@ Open `http://<ec2-ip>:8080` and log in with **admin / admin**. Run the
 the images, and — on success — archives them as downloadable artifacts. A green
 build is required for the next step.
 
-### Step 3 — Deploy the tested image to local k3s
+### Step 3 — Deploy the tested image to local minikube
 
 On your local machine:
 
@@ -101,7 +56,7 @@ JENKINS_URL=http://<ec2-ip>:8080 ./deploy-local.sh
 ```
 
 This checks that the latest Jenkins build passed, downloads the image artifact,
-imports it into k3s, and deploys it. If the build is not green, it refuses to
+loads it into minikube, and deploys it. If the build is not green, it refuses to
 deploy — that's the dependency made real.
 
 ### Step 4 — Tear down (when finished)
@@ -136,6 +91,51 @@ ansible-playbook playbook.yml
 
 ---
 
+## Quick Start (local app)
+
+Tested on Ubuntu 22.04 / 24.04 with at least 4 GB RAM. Every command included —
+assumes a fresh machine.
+
+```bash
+# 1. Clone
+git clone https://github.com/Bragashh/pulse-project.git
+cd pulse-project
+
+# 2. Make the scripts executable (zip/clone can drop the +x bit)
+chmod +x setup.sh start.sh stop.sh simulate-traffic.sh
+
+# 3. Install all prerequisites (Docker, minikube, kubectl, Terraform,
+#    Ansible, AWS CLI, and the project virtualenv). Safe to re-run.
+./setup.sh
+
+# 4. Log out and back in once (so your user picks up the docker group),
+#    OR run this to apply it in the current shell:
+newgrp docker
+
+# 5. Bring the stack up
+./start.sh
+```
+
+When `start.sh` finishes it prints the URLs. Open:
+
+- **Dashboard:** `http://localhost:5000/dashboard`
+- **Grafana:** `http://localhost:3000` (admin / admin)
+- **Prometheus:** `http://localhost:9090`
+
+Generate some traffic so the Grafana panels show activity:
+
+```bash
+./simulate-traffic.sh        # Ctrl+C to stop
+```
+
+Stop everything:
+
+```bash
+./stop.sh
+```
+
+---
+
 ## Running the tests directly
 
 ```bash
@@ -164,6 +164,10 @@ The dashboard provides:
   parallel production deployment.
 - **Rollback** — pick an older deployment from history and redeploy that image.
   The rollback is recorded as a new deployment, keeping an append-only audit trail.
+- **URL shortener panel** — paste a long URL and get a short code back. The panel
+  is served by the url-shortener service that the Jenkins pipeline builds, tests,
+  and deploys to minikube — so the dashboard uses the exact artifact the pipeline
+  produced. A status badge shows whether the service is currently deployed.
 
 The observability stack provides:
 
@@ -182,7 +186,7 @@ The observability stack provides:
 | Frontend | HTML / CSS / JavaScript |
 | Data | SQLite |
 | Observability | Prometheus, Grafana, Loki, Promtail |
-| Orchestration | k3s (lightweight Kubernetes) |
+| Orchestration | minikube (local Kubernetes) |
 | Containers | Docker, docker-compose |
 | Infrastructure as code | Terraform (modular) |
 | Configuration management | Ansible |
@@ -197,8 +201,8 @@ The observability stack provides:
 | --- | --- | --- |
 | 1 | Create machines with Terraform | `terraform/` — provisions the Jenkins EC2 (parameterised, no EIP) |
 | 2 | Configure machines with Ansible | `ansible/` — installs + configures Jenkins via the `jenkins` role |
-| 3 | CI/CD (Jenkins preferred) | Jenkins pipeline on AWS builds + tests + archives the image; `deploy-local.sh` deploys it to k3s; GitHub Actions also runs tests on push |
-| 4 | Containerised app (docker-compose or k8s) | App runs on k3s; monitoring via docker-compose; all services have Dockerfiles |
+| 3 | CI/CD (Jenkins preferred) | Jenkins pipeline on AWS builds + tests + archives the image; `deploy-local.sh` deploys it to minikube; GitHub Actions also runs tests on push |
+| 4 | Containerised app (docker-compose or k8s) | App runs on minikube; monitoring via docker-compose; all services have Dockerfiles |
 | 5 | README explaining how to run / tech / what it does | This file |
 
 ---
@@ -244,7 +248,7 @@ pulse-project/
 ├── docs/architecture.svg     Architecture diagram
 ├── setup.sh                  One-time: install all prerequisites
 ├── provision-aws.sh          Prompt for creds → Terraform → Ansible (one command)
-├── deploy-local.sh           Pull the Jenkins-tested image → deploy to k3s
+├── deploy-local.sh           Pull the Jenkins-tested image → deploy to minikube
 ├── start.sh                  Bring the local stack up
 ├── stop.sh                   Bring the local stack down
 └── simulate-traffic.sh       Continuous traffic generation
@@ -257,7 +261,7 @@ pulse-project/
 - **`./start.sh: Permission denied`** — run `chmod +x *.sh` (Step 2 of Quick Start).
 - **`docker: permission denied`** — your user isn't in the docker group yet; run
   `newgrp docker` or log out and back in.
-- **`start.sh` fails finding k3s/docker** — run `./setup.sh` first.
+- **`start.sh` fails finding minikube/docker** — run `./setup.sh` first.
 - **Ansible can't reach the EC2** — check `inventory/jenkins.ini` has the real IP,
   the instance is running, and your SSH key matches `key_name` in Terraform.
 - **Jenkins not up after the playbook** — give it a minute; a t3.small is slow to

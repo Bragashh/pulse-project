@@ -163,6 +163,52 @@ def dora():
     })
 
 
+# ── URL shortener proxy ───────────────────────────────────────────────────────
+# The shortener runs in minikube, exposed on NodePort 30800. The dashboard calls the
+# Pulse backend, which forwards to the shortener — so the browser only ever talks
+# to one origin and the shortener stays inside the cluster.
+SHORTENER_URL = os.environ.get("SHORTENER_URL", "http://localhost:30800")
+
+
+@app.route('/shortener/shorten', methods=['POST'])
+@metrics.track_request('shortener_shorten')
+def shortener_shorten():
+    """Proxy a shorten request to the url-shortener service in minikube."""
+    data = request.get_json(silent=True) or {}
+    try:
+        resp = requests.post(f"{SHORTENER_URL}/shorten", json=data, timeout=5)
+        return Response(resp.content, status=resp.status_code,
+                        content_type=resp.headers.get('Content-Type', 'application/json'))
+    except requests.exceptions.RequestException:
+        return jsonify({"error": "url-shortener service is not reachable. "
+                                 "Is it deployed to minikube? (deploy-local.sh)"}), 503
+
+
+@app.route('/shortener/status')
+@metrics.track_request('shortener_status')
+def shortener_status():
+    """Report whether the shortener service is up (drives the dashboard panel)."""
+    try:
+        resp = requests.get(f"{SHORTENER_URL}/health", timeout=3)
+        return jsonify({"deployed": resp.status_code == 200})
+    except requests.exceptions.RequestException:
+        return jsonify({"deployed": False})
+
+
+@app.route('/shortener/go/<code>')
+@metrics.track_request('shortener_go')
+def shortener_go(code):
+    """Resolve a short code via the shortener service and redirect the browser."""
+    try:
+        # Ask the shortener but don't auto-follow, so we can relay the redirect.
+        resp = requests.get(f"{SHORTENER_URL}/{code}", timeout=5, allow_redirects=False)
+        if resp.status_code == 302 and 'Location' in resp.headers:
+            return Response(status=302, headers={'Location': resp.headers['Location']})
+        return jsonify({"error": "short code not found"}), 404
+    except requests.exceptions.RequestException:
+        return jsonify({"error": "url-shortener service is not reachable."}), 503
+
+
 @app.route('/score')
 @metrics.track_request('score')
 def score():

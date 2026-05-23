@@ -25,7 +25,7 @@
 
   <rect class="bg" x="0" y="0" width="1060" height="720"/>
   <text x="40" y="42" class="title" font-size="22">Pulse — Connected CI/CD Flow</text>
-  <text x="40" y="64" class="sub" font-size="12">Jenkins builds + tests on AWS → archives the image → the local deploy script pulls that exact image and runs it on k3s</text>
+  <text x="40" y="64" class="sub" font-size="12">Jenkins builds + tests on AWS → archives the image → the local deploy script pulls that exact image and runs it on minikube</text>
 
   <!-- ===== AWS side ===== -->
   <text x="40" y="104" class="lane-l">AWS — provisioned by Terraform, configured by Ansible</text>
@@ -63,12 +63,12 @@
   <rect class="lane" x="710" y="116" width="310" height="470" rx="10"/>
 
   <rect class="box" x="734" y="230" width="262" height="70" rx="8"/>
-  <text x="754" y="256" class="label">docker load + k3s import</text>
-  <text x="754" y="276" class="sub">image goes into k3s containerd</text>
+  <text x="754" y="256" class="label">minikube image load</text>
+  <text x="754" y="276" class="sub">image loaded into minikube</text>
   <text x="754" y="290" class="sub">(imagePullPolicy: Never)</text>
 
   <rect class="boxk" x="734" y="320" width="262" height="90" rx="8"/>
-  <text x="754" y="346" class="label">k3s — url-shortener</text>
+  <text x="754" y="346" class="label">minikube — url-shortener</text>
   <text x="754" y="368" class="sub">runs the exact image Jenkins</text>
   <text x="754" y="384" class="sub">built and tested · + Redis</text>
 
@@ -82,5 +82,5 @@
   <!-- bottom note -->
   <rect class="box" x="40" y="610" width="980" height="64" rx="8"/>
   <text x="60" y="636" class="label">The dependency is real</text>
-  <text x="60" y="656" class="sub">k3s only runs an image that Jenkins built and tested. If the pipeline is red, there is no artifact, and deploy-local.sh refuses. GitHub Actions also runs the 66 tests on every push.</text>
+  <text x="60" y="656" class="sub">minikube only runs an image that Jenkins built and tested. If the pipeline is red, there is no artifact, and deploy-local.sh refuses. GitHub Actions also runs the 66 tests on every push.</text>
 </svg>

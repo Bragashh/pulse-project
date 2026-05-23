@@ -1,12 +1,12 @@
 #!/bin/bash
-# deploy-local.sh — the bridge between Jenkins (on AWS) and local k3s.
+# deploy-local.sh — the bridge between Jenkins (on AWS) and local minikube.
 #
 # Checks that the latest Jenkins pipeline build SUCCEEDED, downloads the
-# url-shortener image artifact it produced, imports it into k3s, and deploys it.
+# url-shortener image artifact it produced, loads it into minikube, and deploys it.
 # If Jenkins has not produced a passing build, this script refuses to deploy —
-# so k3s only ever runs an image that Jenkins built and tested.
+# so minikube only ever runs an image that Jenkins built and tested.
 #
-# The url-shortener is the service that runs on Kubernetes; the Pulse backend
+# The url-shortener is the service that runs on Kubernetes (minikube); the Pulse backend
 # runs as a process and monitoring via docker-compose (see start.sh). This
 # script therefore deploys the url-shortener from the Jenkins-built artifact.
 #
@@ -58,13 +58,13 @@ trap 'rm -rf "$WORKDIR"' EXIT
 echo "→ Downloading ${IMAGE}.tar from Jenkins..."
 curl -fsSL $AUTH "${ARTIFACT_BASE}/${IMAGE}.tar" -o "${WORKDIR}/${IMAGE}.tar"
 
-# ── Import the image into k3s's containerd ────────────────────────────────────
-# k3s does not use the host Docker; the image must be imported into its own
-# containerd so pods can use it with imagePullPolicy: Never.
-echo "→ Importing ${IMAGE} into k3s..."
-sudo k3s ctr images import "${WORKDIR}/${IMAGE}.tar"
+# ── Load the image into minikube ──────────────────────────────────────────────
+# minikube runs its own container runtime; the image must be loaded into it so
+# pods can use it with imagePullPolicy: Never.
+echo "→ Loading ${IMAGE} into minikube..."
+minikube image load "${WORKDIR}/${IMAGE}.tar"
 
-# ── Deploy to k3s ─────────────────────────────────────────────────────────────
+# ── Deploy to minikube ─────────────────────────────────────────────────────────────
 echo "→ Applying Kubernetes manifests..."
 kubectl apply -f kubernetes/url-shortener/
 
@@ -73,6 +73,6 @@ kubectl rollout restart deployment url-shortener -n url-shortener 2>/dev/null ||
 
 echo ""
 echo "=================================================="
-echo " Deployed the Jenkins-built url-shortener to local k3s."
+echo " Deployed the Jenkins-built url-shortener to local minikube."
 echo " Check status with:  kubectl get pods -n url-shortener"
 echo "=================================================="

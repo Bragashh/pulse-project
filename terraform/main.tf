@@ -19,7 +19,7 @@ module "networking" {
   ssh_cidr            = var.ssh_cidr
 }
 
-# Single EC2 that hosts Jenkins. The application itself runs locally on k3s;
+# Single EC2 that hosts Jenkins. The application itself runs locally on minikube;
 # this machine exists to demonstrate the Terraform -> Ansible -> Jenkins toolchain.
 module "jenkins" {
   source            = "./modules/ec2"

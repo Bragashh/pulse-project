@@ -1,6 +1,6 @@
 #!/bin/bash
 # Bring up the full Pulse stack for local development.
-# Starts: k3s (if not running), Flask backend, monitoring (Prometheus/Grafana/Loki/Promtail).
+# Starts: minikube (if not running), Flask backend, monitoring (Prometheus/Grafana/Loki/Promtail).
 
 set -e
 
@@ -9,13 +9,19 @@ PULSE_DB="${PULSE_DB_PATH:-/tmp/pulse_smoke.db}"
 
 cd "$REPO_ROOT"
 
-echo "→ Checking k3s..."
-if ! sudo systemctl is-active --quiet k3s; then
-    echo "  Starting k3s..."
-    sudo systemctl start k3s
-    sleep 5
+echo "→ Checking minikube..."
+if ! minikube status >/dev/null 2>&1; then
+    echo "  Starting minikube..."
+    minikube start --driver=docker
 fi
-kubectl get nodes >/dev/null && echo "  k3s OK"
+kubectl get nodes >/dev/null && echo "  minikube OK"
+
+# Discover how the backend should reach the in-cluster url-shortener (NodePort 30800).
+MINIKUBE_IP=$(minikube ip 2>/dev/null || echo "")
+if [ -n "$MINIKUBE_IP" ]; then
+    export SHORTENER_URL="http://${MINIKUBE_IP}:30800"
+    echo "  Shortener will be reached at $SHORTENER_URL"
+fi
 
 echo "→ Ensuring UFW rule for port 5000..."
 sudo ufw allow 5000/tcp >/dev/null 2>&1 || true
@@ -37,7 +43,7 @@ if [ -n "$existing_pid" ]; then
     kill "$existing_pid" 2>/dev/null || true
     sleep 1
 fi
-PULSE_DB_PATH="$PULSE_DB" nohup python3 app.py > /tmp/pulse-backend.log 2>&1 &
+PULSE_DB_PATH="$PULSE_DB" SHORTENER_URL="${SHORTENER_URL:-http://localhost:30800}" nohup python3 app.py > /tmp/pulse-backend.log 2>&1 &
 FLASK_PID=$!
 echo "  Flask started (pid $FLASK_PID), logs at /tmp/pulse-backend.log"
 cd "$REPO_ROOT"

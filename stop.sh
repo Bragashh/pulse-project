@@ -18,4 +18,4 @@ cd "$REPO_ROOT/monitoring"
 sudo docker compose down
 
 echo ""
-echo "✓ Stopped. (k3s left running — stop manually with: sudo systemctl stop k3s)"
+echo "✓ Stopped. (minikube left running — stop manually with: minikube stop)"

@@ -82,6 +82,24 @@
       color: #f87171; font-size: 0.8rem; margin-top: 12px; min-height: 1em;
     }
     .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+    /* URL shortener panel */
+    .shortener-row { display: flex; gap: 10px; margin-top: 14px; }
+    .shortener-row input {
+      flex: 1; padding: 11px 14px; border-radius: 8px;
+      background: #11151f; color: #e2e8f0; border: 1px solid #1e2330; font-size: 0.9rem;
+    }
+    .shortener-row input:focus { outline: none; border-color: #0369a1; }
+    .shortener-result { margin-top: 14px; font-size: 0.88rem; min-height: 1.2em; }
+    .shortener-result a { color: #7dd3fc; text-decoration: none; word-break: break-all; }
+    .shortener-result a:hover { text-decoration: underline; }
+    .shortener-result .muted { color: #475569; }
+    .shortener-result .err { color: #f87171; }
+
+    /* Light refresh: subtle card hover + header polish */
+    .card { transition: border-color 0.15s ease; }
+    .card:hover { border-color: #2a3550; }
+    header { border-bottom: 1px solid #1e2330; padding-bottom: 16px; }
   </style>
 </head>
 <body>
@@ -160,6 +178,21 @@
         <div class="card-value" id="failure-rate">—</div>
         <div class="card-sub" id="runs-info">pipeline runs</div>
       </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-header">
+      <div class="section-title">URL Shortener</div>
+      <span class="badge" id="shortener-badge">checking…</span>
+    </div>
+    <div class="card">
+      <div class="card-label">Shorten a URL — served by the service deployed to minikube via the Jenkins pipeline</div>
+      <div class="shortener-row">
+        <input type="text" id="shortener-input" placeholder="https://example.com/very/long/link" autocomplete="off" />
+        <button class="btn btn-primary" id="shortener-btn">Shorten</button>
+      </div>
+      <div class="shortener-result" id="shortener-result"></div>
     </div>
   </div>
 
@@ -631,8 +664,60 @@
     if (e.target === rollbackModal) rollbackModal.classList.remove('show');
   });
 
+  // ── URL shortener panel ─────────────────────────────────────────────────────
+  const shortenerBadge  = document.getElementById('shortener-badge');
+  const shortenerInput  = document.getElementById('shortener-input');
+  const shortenerBtn    = document.getElementById('shortener-btn');
+  const shortenerResult = document.getElementById('shortener-result');
+
+  async function refreshShortenerStatus() {
+    try {
+      const res = await fetch(API + '/shortener/status');
+      const data = await res.json();
+      if (data.deployed) {
+        shortenerBadge.textContent = 'up';
+        shortenerBadge.className = 'badge up';
+      } else {
+        shortenerBadge.textContent = 'not deployed';
+        shortenerBadge.className = 'badge down';
+      }
+    } catch (e) {
+      shortenerBadge.textContent = 'unknown';
+      shortenerBadge.className = 'badge degraded';
+    }
+  }
+
+  async function doShorten() {
+    const url = shortenerInput.value.trim();
+    if (!url) return;
+    shortenerResult.innerHTML = '<span class="muted">Shortening…</span>';
+    try {
+      const res = await fetch(API + '/shortener/shorten', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (res.ok && data.short) {
+        shortenerResult.innerHTML =
+          'Short code: <a href="' + API + '/shortener/go/' + data.short +
+          '" target="_blank">' + data.short + '</a> <span class="muted">→ ' + data.url + '</span>';
+        shortenerInput.value = '';
+      } else {
+        shortenerResult.innerHTML = '<span class="err">' + (data.error || 'Failed to shorten.') + '</span>';
+      }
+    } catch (e) {
+      shortenerResult.innerHTML = '<span class="err">Network error: ' + e.message + '</span>';
+    }
+  }
+
+  shortenerBtn.addEventListener('click', doShorten);
+  shortenerInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doShorten(); });
+
   refresh();
+  refreshShortenerStatus();
   setInterval(refresh, 10000);  // Faster refresh so deployment status updates feel live
+  setInterval(refreshShortenerStatus, 10000);
 </script>
 </body>
 </html>

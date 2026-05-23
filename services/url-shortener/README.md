@@ -22,12 +22,12 @@ Reads from environment variables:
 
 Kubernetes manifests for this service live in `kubernetes/url-shortener/`.
 
-Local development against k3s:
+Local development against minikube:
 
 ```bash
-# Build and import the image into k3s
+# Build and load the image into minikube
 sudo docker build -t url-shortener:dev services/url-shortener/
-sudo docker save url-shortener:dev | sudo k3s ctr images import -
+minikube image load url-shortener:dev
 
 # Deploy
 kubectl apply -f kubernetes/url-shortener/

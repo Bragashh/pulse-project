@@ -2,7 +2,7 @@
 # One-time setup: install everything needed to run Pulse locally and to deploy
 # the AWS/Jenkins toolchain. Safe to re-run — each step is idempotent.
 #
-# Installs: Docker + compose, k3s, kubectl, Python venv tooling, Terraform,
+# Installs: Docker + compose, minikube, kubectl, Python venv tooling, Terraform,
 #           Ansible (+ required collections), AWS CLI.
 #
 # Tested on Ubuntu 22.04 / 24.04. Run with: ./setup.sh
@@ -42,13 +42,15 @@ else
     echo "✓ .venv already exists"
 fi
 
-# ── k3s (lightweight Kubernetes) ──────────────────────────────────────────────
-if ! command -v k3s >/dev/null 2>&1; then
-    echo "→ Installing k3s..."
-    curl -sfL https://get.k3s.io | sh -
-    echo "✓ k3s installed"
+# ── minikube (local Kubernetes) ───────────────────────────────────────────────
+if ! command -v minikube >/dev/null 2>&1; then
+    echo "→ Installing minikube..."
+    curl -sLO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+    sudo install minikube-linux-amd64 /usr/local/bin/minikube
+    rm -f minikube-linux-amd64
+    echo "✓ minikube installed"
 else
-    echo "✓ k3s already present"
+    echo "✓ minikube already present"
 fi
 
 # ── kubectl ───────────────────────────────────────────────────────────────────
