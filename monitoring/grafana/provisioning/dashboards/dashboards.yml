@@ -1,0 +1,14 @@
+apiVersion: 1
+
+# Loads any dashboard JSON found in the dashboards directory on startup.
+providers:
+  - name: pulse
+    orgId: 1
+    folder: Pulse
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards/json
+      foldersFromFilesStructure: false
