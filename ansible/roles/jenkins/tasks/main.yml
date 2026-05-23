@@ -3,7 +3,7 @@
 - name: Install base packages (Java, tools, Docker, pip)
   apt:
     name:
-      - openjdk-17-jre-headless    # Jenkins LTS needs Java 17
+      - openjdk-21-jre-headless    # Jenkins LTS now requires Java 21
       - curl
       - gnupg
       - ca-certificates
@@ -73,6 +73,14 @@
     path: /usr/lib/systemd/system/jenkins.service
     regexp: '^Environment="JAVA_OPTS'
     line: 'Environment="JAVA_OPTS=-Djenkins.install.runSetupWizard=false"'
+    insertafter: '^\[Service\]'
+
+- name: Point Jenkins explicitly at Java 21
+  # Java 17 may still be the system default; the current Jenkins LTS needs 21.
+  lineinfile:
+    path: /usr/lib/systemd/system/jenkins.service
+    regexp: '^Environment="JENKINS_JAVA_CMD'
+    line: 'Environment="JENKINS_JAVA_CMD=/usr/lib/jvm/java-21-openjdk-amd64/bin/java"'
     insertafter: '^\[Service\]'
 
 - name: Add jenkins user to the docker group
