@@ -24,8 +24,6 @@ def github_headers():
 app = Flask(__name__)
 CORS(app)
 
-# Serve the frontend for local smoke testing.
-# In production, nginx serves the frontend and proxies /api to this backend.
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend')
 
 
@@ -164,9 +162,6 @@ def dora():
 
 
 # ── URL shortener proxy ───────────────────────────────────────────────────────
-# The shortener runs in minikube, exposed on NodePort 30800. The dashboard calls the
-# Pulse backend, which forwards to the shortener — so the browser only ever talks
-# to one origin and the shortener stays inside the cluster.
 SHORTENER_URL = os.environ.get("SHORTENER_URL", "http://localhost:30800")
 
 
@@ -378,15 +373,12 @@ def deploy_service_endpoint():
     if environment not in ("staging", "production"):
         return jsonify({"error": "environment must be 'staging' or 'production'"}), 400
 
-    # Avoid name collisions per environment
     existing = db.get_deployed_service_by_name(name, environment)
     if existing:
-        return jsonify({
-            "error": f"a service named '{name}' already exists in {environment}"
-        }), 409
-
-    # Record the service in the DB
-    service_id = db.add_deployed_service(name, environment, image, port, replicas)
+        service_id = existing["id"]
+        db.update_deployed_service(service_id, image, port, replicas)
+    else:
+        service_id = db.add_deployed_service(name, environment, image, port, replicas)
     deployment_id = db.add_deployment(service_id, image, environment, status="deploying")
 
     # Trigger the actual Kubernetes deploy
@@ -494,9 +486,6 @@ def promote_deployment(name):
         prod_service_id, image, "production", status="deploying"
     )
 
-    # The deployer doesn't currently namespace by environment — it uses pulse-deployed
-    # for everything. To keep staging and production separated, we suffix the production
-    # deployment name. This way both can coexist in the same namespace.
     prod_deployment_name = f"{name}-prod"
 
     try:

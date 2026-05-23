@@ -11,9 +11,11 @@ def client(tmp_path, monkeypatch):
     test_db_path = tmp_path / "test_pulse.db"
     monkeypatch.setenv("PULSE_DB_PATH", str(test_db_path))
 
+    # Reload db module so it picks up the new env var path
     import db
     importlib.reload(db)
 
+    # Reload app so it uses the reloaded db module
     import app
     importlib.reload(app)
 
@@ -360,6 +362,7 @@ def test_deploy_endpoint_returns_202(client, mocker):
         "namespace": "pulse-deployed",
         "node_port": 31000,
     })
+    # Don't actually start the polling thread
     mocker.patch("app.threading.Thread")
 
     response = client.post("/services/deploy", json={
@@ -406,20 +409,27 @@ def test_deploy_rejects_invalid_environment(client):
     assert response.status_code == 400
 
 
-def test_deploy_rejects_duplicate_name(client, mocker):
-    """Cannot deploy two services with the same name in same environment."""
+def test_deploy_existing_name_redeploys_and_builds_history(client, mocker):
+    """Redeploying an existing name records a new history entry (enables rollback)."""
     mocker.patch("app.deployer.deploy_service", return_value={
         "deployment": "dupe", "service": "dupe", "namespace": "pulse-deployed", "node_port": 31000,
     })
     mocker.patch("app.threading.Thread")
 
+    # First deploy
     client.post("/services/deploy", json={
-        "name": "dupe", "image": "nginx", "port": 80, "environment": "staging",
+        "name": "dupe", "image": "nginx:1.25", "port": 80, "environment": "staging",
     })
+    # Redeploy same name with a new image — should be accepted, not rejected
     response = client.post("/services/deploy", json={
-        "name": "dupe", "image": "nginx", "port": 80, "environment": "staging",
+        "name": "dupe", "image": "nginx:1.27", "port": 80, "environment": "staging",
     })
-    assert response.status_code == 409
+    assert response.status_code == 202
+
+    # History should now contain two entries for this service
+    history = client.get("/deployments/dupe/history?environment=staging")
+    assert history.status_code == 200
+    assert len(history.get_json()["history"]) == 2
 
 
 def test_deploy_handles_kubernetes_failure(client, mocker):
@@ -642,6 +652,7 @@ def test_rollback_uses_correct_image(client, mocker):
 
     client.post("/deployments/imgtest/rollback", json={"deployment_id": target_id})
 
+    # The second deploy call (the rollback) should use the old image
     assert len(deploy_calls) == 2
     assert deploy_calls[1]["image"] == "imgtest:old"
 

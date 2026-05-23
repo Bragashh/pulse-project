@@ -1,20 +1,3 @@
-"""
-Database module for Pulse.
-
-Manages the SQLite database used to track monitored services,
-deployed services, and deployment history.
-
-Three tables:
-  - monitored_services: external URLs Pulse pings (Google, GitHub, etc.)
-  - deployed_services: services Pulse has deployed to Kubernetes
-  - deployments: append-only history of every deploy and rollback
-
-Soft deletes are used for service tables. Deployments are never deleted.
-
-The schema is initialized lazily on the first connection — no startup
-hook required, works regardless of how the app is launched.
-"""
-
 import os
 import sqlite3
 from contextlib import contextmanager
@@ -68,8 +51,6 @@ def _get_db_path() -> str:
     return os.environ.get("PULSE_DB_PATH", "/data/pulse.db")
 
 
-# Module-level flag tracking whether the current DB file has been initialized.
-# Cleared on reload (so tests using importlib.reload get a fresh state).
 _initialized_for_path: Optional[str] = None
 
 
@@ -91,7 +72,6 @@ def _ensure_initialized():
     if db_dir:
         os.makedirs(db_dir, exist_ok=True)
 
-    # Open a raw connection (not via get_connection, to avoid recursion)
     conn = sqlite3.connect(current_path)
     try:
         conn.executescript(SCHEMA)
@@ -263,6 +243,17 @@ def get_deployed_service_by_name(name: str, environment: str) -> dict | None:
             (name, environment),
         ).fetchone()
         return dict(row) if row else None
+
+
+def update_deployed_service(service_id: int, image: str, port: int, replicas: int) -> bool:
+    """Update an existing service's current image/port/replicas (used on redeploy)."""
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "UPDATE deployed_services SET image = ?, port = ?, replicas = ? "
+            "WHERE id = ? AND deleted_at IS NULL",
+            (image, port, replicas, service_id),
+        )
+        return cursor.rowcount > 0
 
 
 def soft_delete_deployed_service(service_id: int) -> bool:
