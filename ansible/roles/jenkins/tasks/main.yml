@@ -120,7 +120,7 @@
   command: >
     java -jar /tmp/jenkins-plugin-manager.jar
     --war {{ jenkins_war_path.stdout }}
-    --plugin-dir /var/lib/jenkins/plugins
+    --plugin-download-directory /var/lib/jenkins/plugins
     --plugins {{ jenkins_plugins | join(' ') }}
   register: plugin_cli
   changed_when: plugin_cli.rc == 0
@@ -177,3 +177,4 @@
 - name: Show where Jenkins is reachable
   debug:
     msg: "Jenkins is up. Log in at http://{{ ansible_host | default(inventory_hostname) }}:{{ jenkins_http_port }} with user '{{ jenkins_admin_user }}'."
+ 
