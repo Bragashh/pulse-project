@@ -1,3 +1,4 @@
+
 // Pulse CI/CD pipeline (Option 1: artifact-based delivery, no registry).
 // Builds the images, runs the 66 backend tests, and — on success — saves the
 // backend image as a tarball and archives it. The local deploy-local.sh script
@@ -5,22 +6,22 @@
 // image this pipeline built and tested.
 pipeline {
     agent any
-
+ 
     environment {
         IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
-
+ 
     options {
         disableConcurrentBuilds()
     }
-
+ 
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
-
+ 
         stage('Backend tests (66)') {
             steps {
                 sh '''
@@ -32,14 +33,14 @@ pipeline {
                 '''
             }
         }
-
+ 
         stage('Build images') {
             steps {
                 sh '''
                     docker build -t pulse-backend:${IMAGE_TAG}       portal/backend
                     docker build -t pulse-frontend:${IMAGE_TAG}      portal/frontend
                     docker build -t pulse-url-shortener:${IMAGE_TAG} services/url-shortener
-
+ 
                     # Also tag :latest so the deploy script can fetch a stable name
                     docker tag pulse-backend:${IMAGE_TAG}       pulse-backend:latest
                     docker tag pulse-frontend:${IMAGE_TAG}      pulse-frontend:latest
@@ -47,7 +48,7 @@ pipeline {
                 '''
             }
         }
-
+ 
         stage('Save image artifacts') {
             steps {
                 sh '''
@@ -61,7 +62,7 @@ pipeline {
             }
         }
     }
-
+ 
     post {
         success {
             echo "Build ${IMAGE_TAG} passed — image artifacts archived and ready for deploy-local.sh."
