@@ -17,10 +17,13 @@ pipeline_repo_url: "https://github.com/Bragashh/pulse-project.git"
 pipeline_repo_branch: "main"
  
 # Plugins required for the seed pipeline job (Git SCM + pipeline support).
+# jenkins-plugin-cli resolves all transitive dependencies, so we can list the
+# high-level plugins. git + pipeline for the job, stage-view + blueocean for the
+# visual pipeline display, configuration-as-code for completeness.
 jenkins_plugins:
   - git
   - workflow-aggregator
   - configuration-as-code
-  - pipeline-stage-view      # horizontal stage boxes on the job page
-  - blueocean                # modern visual pipeline UI
+  - pipeline-stage-view
+  - blueocean
 jenkins_cli_jar: /tmp/jenkins-cli.jar

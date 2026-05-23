@@ -14,13 +14,13 @@
       - unzip
     state: present
     update_cache: yes
-
+ 
 - name: Ensure Docker is running
   service:
     name: docker
     state: started
     enabled: yes
-
+ 
 - name: Install AWS CLI v2
   shell: |
     cd /tmp
@@ -29,7 +29,7 @@
     ./aws/install --update
   args:
     creates: /usr/local/bin/aws
-
+ 
 # ── Jenkins repository + install ──────────────────────────────────────────────
 - name: Discover the latest Jenkins LTS .deb filename
   # The apt repo's GPG keys are unreliable (rotated/expired), so we install the
@@ -39,25 +39,25 @@
       | grep -oP 'jenkins_[0-9.]+_all\.deb' | sort -V | tail -1
   register: jenkins_deb_name
   changed_when: false
-
+ 
 - name: Download the Jenkins LTS .deb
   get_url:
     url: "https://get.jenkins.io/debian-stable/{{ jenkins_deb_name.stdout }}"
     dest: /tmp/jenkins.deb
     mode: '0644'
-
+ 
 - name: Install Jenkins from the .deb (pulls deps if needed)
   apt:
     deb: /tmp/jenkins.deb
     state: present
-
+ 
 # The .deb auto-starts Jenkins, which begins the setup wizard. Stop it and clear
 # the first-run state so the wizard-skip + seeded admin take effect on next start.
 - name: Stop Jenkins before reconfiguring
   service:
     name: jenkins
     state: stopped
-
+ 
 - name: Remove first-run wizard state files
   file:
     path: "{{ item }}"
@@ -66,7 +66,7 @@
     - /var/lib/jenkins/secrets/initialAdminPassword
     - /var/lib/jenkins/jenkins.install.UpgradeWizard.state
     - /var/lib/jenkins/jenkins.install.InstallUtil.lastExecVersion
-
+ 
 # ── Skip the setup wizard ─────────────────────────────────────────────────────
 - name: Disable the Jenkins setup wizard
   lineinfile:
@@ -74,7 +74,7 @@
     regexp: '^Environment="JAVA_OPTS'
     line: 'Environment="JAVA_OPTS=-Djenkins.install.runSetupWizard=false"'
     insertafter: '^\[Service\]'
-
+ 
 - name: Point Jenkins explicitly at Java 21
   # Java 17 may still be the system default; the current Jenkins LTS needs 21.
   lineinfile:
@@ -82,58 +82,58 @@
     regexp: '^Environment="JENKINS_JAVA_CMD'
     line: 'Environment="JENKINS_JAVA_CMD=/usr/lib/jvm/java-21-openjdk-amd64/bin/java"'
     insertafter: '^\[Service\]'
-
+ 
 - name: Add jenkins user to the docker group
   user:
     name: jenkins
     groups: docker
     append: yes
-
-- name: Reload systemd after unit change
-  systemd:
-    daemon_reload: yes
-
-- name: Enable and start Jenkins
-  service:
-    name: jenkins
-    state: restarted
-    enabled: yes
-
-- name: Wait for Jenkins to come up on port {{ jenkins_http_port }}
-  wait_for:
-    port: "{{ jenkins_http_port }}"
-    delay: 15
-    timeout: 180
-
-# ── Install required plugins (before the seed job needs them) ──────────────────
-# With the wizard skipped, no plugins are present. The jenkins_plugin module
-# downloads them via the update center and restarts Jenkins to load them.
-- name: Install Jenkins plugins
-  community.general.jenkins_plugin:
-    name: "{{ item }}"
-    url_username: ""
-    url_password: ""
-    url: "http://localhost:{{ jenkins_http_port }}"
-    state: present
-    timeout: 120
-  loop: "{{ jenkins_plugins }}"
-  register: plugin_result
-  until: plugin_result is succeeded
-  retries: 3
-  delay: 10
-  notify: restart jenkins
-
-# Flush so plugins are loaded before the Groovy scripts that depend on them run.
-- name: Apply plugin install (restart Jenkins now)
-  meta: flush_handlers
-
-- name: Wait for Jenkins again after plugin restart
-  wait_for:
-    port: "{{ jenkins_http_port }}"
-    delay: 10
-    timeout: 180
-
-# ── Seed admin user + pipeline job via Groovy init scripts ────────────────────
+ 
+# ── Place plugins + Groovy scripts BEFORE starting Jenkins ────────────────────
+# Installing plugins over the HTTP API fights CSRF on a wizard-skipped Jenkins.
+# Instead we use jenkins-plugin-cli (ships with the Jenkins package), which
+# resolves all dependencies and writes the .jpi files directly — no API, no CSRF.
+- name: Create the Jenkins plugins directory
+  file:
+    path: /var/lib/jenkins/plugins
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: '0755'
+ 
+- name: Download jenkins-plugin-manager (resolves plugin dependencies offline)
+  get_url:
+    url: "https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.13.2/jenkins-plugin-manager-2.13.2.jar"
+    dest: /tmp/jenkins-plugin-manager.jar
+    mode: '0644'
+ 
+- name: Locate the Jenkins war
+  shell: |
+    for p in /usr/share/java/jenkins.war /usr/lib/jenkins/jenkins.war /usr/share/jenkins/jenkins.war; do
+      [ -f "$p" ] && echo "$p" && exit 0
+    done
+    exit 1
+  register: jenkins_war_path
+  changed_when: false
+ 
+- name: Install plugins with jenkins-plugin-cli (resolves dependencies)
+  command: >
+    java -jar /tmp/jenkins-plugin-manager.jar
+    --war {{ jenkins_war_path.stdout }}
+    --plugin-dir /var/lib/jenkins/plugins
+    --plugins {{ jenkins_plugins | join(' ') }}
+  register: plugin_cli
+  changed_when: plugin_cli.rc == 0
+  failed_when: plugin_cli.rc != 0
+ 
+- name: Ensure plugins are owned by jenkins
+  file:
+    path: /var/lib/jenkins/plugins
+    state: directory
+    owner: jenkins
+    group: jenkins
+    recurse: yes
+ 
 - name: Create Jenkins init.groovy.d directory
   file:
     path: /var/lib/jenkins/init.groovy.d
@@ -141,7 +141,7 @@
     owner: jenkins
     group: jenkins
     mode: '0755'
-
+ 
 - name: Install admin-user bootstrap script
   template:
     src: basic-security.groovy.j2
@@ -149,8 +149,7 @@
     owner: jenkins
     group: jenkins
     mode: '0644'
-  notify: restart jenkins
-
+ 
 - name: Install seed-job bootstrap script
   template:
     src: seed-job.groovy.j2
@@ -158,17 +157,23 @@
     owner: jenkins
     group: jenkins
     mode: '0644'
-  notify: restart jenkins
-
-- name: Apply Groovy init scripts (restart Jenkins)
-  meta: flush_handlers
-
-- name: Final wait for Jenkins
+ 
+- name: Reload systemd after unit change
+  systemd:
+    daemon_reload: yes
+ 
+- name: Enable and start Jenkins (plugins + scripts already in place)
+  service:
+    name: jenkins
+    state: restarted
+    enabled: yes
+ 
+- name: Wait for Jenkins to come up on port {{ jenkins_http_port }}
   wait_for:
     port: "{{ jenkins_http_port }}"
-    delay: 10
-    timeout: 180
-
+    delay: 20
+    timeout: 240
+ 
 - name: Show where Jenkins is reachable
   debug:
     msg: "Jenkins is up. Log in at http://{{ ansible_host | default(inventory_hostname) }}:{{ jenkins_http_port }} with user '{{ jenkins_admin_user }}'."
