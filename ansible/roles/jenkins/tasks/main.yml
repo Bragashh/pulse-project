@@ -8,6 +8,7 @@
       - gnupg
       - ca-certificates
       - docker.io
+      - git
       - python3-pip
       - python3-venv
       - unzip
@@ -30,22 +31,41 @@
     creates: /usr/local/bin/aws
 
 # ── Jenkins repository + install ──────────────────────────────────────────────
-- name: Add Jenkins apt key
+- name: Discover the latest Jenkins LTS .deb filename
+  # The apt repo's GPG keys are unreliable (rotated/expired), so we install the
+  # .deb directly from the Jenkins mirror — no GPG repo needed.
+  shell: |
+    curl -fsSL https://get.jenkins.io/debian-stable/ \
+      | grep -oP 'jenkins_[0-9.]+_all\.deb' | sort -V | tail -1
+  register: jenkins_deb_name
+  changed_when: false
+
+- name: Download the Jenkins LTS .deb
   get_url:
-    url: "{{ jenkins_repo_key_url }}"
-    dest: /usr/share/keyrings/jenkins-keyring.asc
+    url: "https://get.jenkins.io/debian-stable/{{ jenkins_deb_name.stdout }}"
+    dest: /tmp/jenkins.deb
+    mode: '0644'
 
-- name: Add Jenkins apt repository
-  apt_repository:
-    repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
-    state: present
-    filename: jenkins
-
-- name: Install Jenkins
+- name: Install Jenkins from the .deb (pulls deps if needed)
   apt:
-    name: jenkins
+    deb: /tmp/jenkins.deb
     state: present
-    update_cache: yes
+
+# The .deb auto-starts Jenkins, which begins the setup wizard. Stop it and clear
+# the first-run state so the wizard-skip + seeded admin take effect on next start.
+- name: Stop Jenkins before reconfiguring
+  service:
+    name: jenkins
+    state: stopped
+
+- name: Remove first-run wizard state files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /var/lib/jenkins/secrets/initialAdminPassword
+    - /var/lib/jenkins/jenkins.install.UpgradeWizard.state
+    - /var/lib/jenkins/jenkins.install.InstallUtil.lastExecVersion
 
 # ── Skip the setup wizard ─────────────────────────────────────────────────────
 - name: Disable the Jenkins setup wizard

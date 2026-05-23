@@ -2,8 +2,6 @@
 jenkins_admin_user: "admin"
 
 # Jenkins version channel — "stable" pulls the LTS line.
-jenkins_repo_key_url: "https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key"
-jenkins_repo_url: "deb https://pkg.jenkins.io/debian-stable binary/"
 
 # Port Jenkins listens on (matches the security group rule in Terraform).
 jenkins_http_port: 8080
