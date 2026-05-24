@@ -14,13 +14,13 @@ This README is a practical guide. Follow the steps in order and it runs.
 
 The short version: Terraform creates an EC2 on AWS, Ansible installs Jenkins on
 it, the Jenkins pipeline builds and tests the app and packages it as an image,
-and your local machine pulls that exact image and runs it on minikube. Grafana,
+and the local machine pulls that exact image and runs it on minikube. Grafana,
 Prometheus, and Loki provide monitoring. The AWS side is temporary — it exists
-only to build the image, and you tear it down afterwards.
+only to build the image, and can be taken down after that.
 
 ## Ports
 
-Once everything is running, these are the addresses you'll use:
+Once everything is running, these are the addresses:
 
 | Service | Port | URL | Where it runs |
 | --- | --- | --- | --- |
@@ -91,8 +91,7 @@ JENKINS_URL=http://<ec2-ip>:8080 ./deploy-local.sh
 ```
 
 This checks that the latest Jenkins build passed, downloads the image artifact,
-loads it into minikube, and deploys it. If the build isn't green it refuses to
-deploy. Open `http://localhost:5000/dashboard` to use the app.
+loads it into minikube, and deploys it. Open `http://localhost:5000/dashboard` to use the app.
 
 ### Step 6 — Tear down the AWS side
 
@@ -102,8 +101,7 @@ cd terraform && terraform destroy
 
 Do this once Step 5 is done. It's safe: the image is already loaded into your
 local minikube, so the EC2 has served its only purpose (building it). Tearing it
-down just stops the AWS charges — your local app keeps running. A `t3.small` for
-an hour of testing costs only a few cents.
+down just stops the AWS charges — your local app keeps running. It's on a `t3.small` instance.
 
 ### Manual alternative to Step 2
 
@@ -135,8 +133,7 @@ Kubernetes API and creates a real deployment in minikube, tracking it from
 "deploying" to "healthy". You can deploy any publicly pullable image this way.
 
 **Promote.** Once a service is deployed to staging, promoting it runs the same
-image as a parallel production deployment — the typical "staging looks good,
-ship it to prod" step.
+image as a parallel production deployment.
 
 **Rollback.** Each deployment is recorded in an append-only history. Rollback
 lets you pick an earlier version and redeploy that image, so you can recover from
