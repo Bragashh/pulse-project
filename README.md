@@ -66,6 +66,8 @@ Ansible to install Jenkins on it:
 
 When it finishes it prints the Jenkins URL.
 
+> **Note:** The default AMI is region-specific (Ubuntu 24.04 in `eu-central-1`). If you change `region` in `terraform.tfvars`, you must also set a matching `ami` for that region, or provisioning fails with `InvalidAMIID.NotFound`. 
+
 ### Step 3 — Run the pipeline
 
 Open `http://<ec2-ip>:8080` and log in with **admin / admin**. Run the
